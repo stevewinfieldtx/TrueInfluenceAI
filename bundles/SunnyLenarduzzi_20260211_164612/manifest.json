@@ -1,9 +1,0 @@
-{
-  "channel": "SunnyLenarduzzi",
-  "created": "2026-02-11T16:46:12.569686",
-  "total_videos": 50,
-  "videos_with_captions": 50,
-  "total_chunks": 571,
-  "embedded_chunks": 571,
-  "embedding_model": "qwen/qwen3-embedding-8b"
-}
