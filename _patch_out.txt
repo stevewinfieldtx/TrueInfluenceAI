@@ -1,0 +1,5 @@
+[!] Could not find generateInsights prompt marker
+[OK] Patched Strategic Brief prompt
+[OK] Patched Platform Strategy prompt
+
+Done. Dashboard prompts now include recency bias instructions.

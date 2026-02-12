@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SunnyLenarduzzi — Content Intelligence</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f1117;color:#e0e0e0;overflow:hidden;height:100vh}
+.header{padding:12px 24px;background:#161822;border-bottom:1px solid #2a2d3a;display:flex;justify-content:space-between;align-items:center;height:50px;z-index:100;position:relative}
+.header h1{font-size:18px;font-weight:600;color:#fff}
+.header h1 span{color:#6c63ff}
+.hstats{display:flex;gap:18px;font-size:11px;color:#666}
+.hstats b{color:#fff}
+#treemapView{position:absolute;top:50px;left:0;right:0;bottom:0;transition:opacity .3s,transform .3s}
+#treemapView.hidden{opacity:0;pointer-events:none;transform:scale(.97)}
+.treemap-item{position:absolute;display:flex;align-items:center;justify-content:center;flex-direction:column;cursor:pointer;padding:6px;text-align:center;overflow:hidden;border:1px solid rgba(0,0,0,.25);transition:filter .12s}
+.treemap-item:hover{filter:brightness(1.25);z-index:10}
+.t-name{font-weight:700;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.7);line-height:1.15;word-break:break-word}
+.t-sub{font-size:10px;color:rgba(255,255,255,.5);margin-top:2px}
+#topicView{position:absolute;top:50px;left:0;right:0;bottom:0;overflow-y:auto;background:#0f1117;transition:opacity .3s,transform .3s}
+#topicView.hidden{opacity:0;pointer-events:none;transform:scale(1.03)}
+.back-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#1e2030;border:1px solid #2a2d3a;color:#aaa;border-radius:8px;cursor:pointer;font-size:13px;transition:background .15s}
+.back-btn:hover{background:#2a2d3a;color:#fff}
+.topic-hero{padding:32px 40px 24px;background:linear-gradient(135deg,#161822,#1a1d30);border-bottom:1px solid #2a2d3a}
+.topic-hero h2{font-size:28px;color:#fff;margin:16px 0 8px}
+.topic-hero .trend-label{font-size:13px}
+.metrics-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;padding:20px 40px}
+.metric-card{background:#161822;border:1px solid #2a2d3a;border-radius:12px;padding:16px 20px;text-align:center}
+.metric-card .mv{font-size:28px;font-weight:700;color:#fff}
+.metric-card .ml{font-size:10px;color:#555;text-transform:uppercase;margin-top:4px}
+.metric-card.hot .mv{color:#ff6b6b}
+.metric-card.cool .mv{color:#6bcb77}
+.timeline-section{padding:20px 40px}
+.timeline-section h3{font-size:13px;color:#888;margin-bottom:12px}
+.timeline-chart{display:flex;align-items:flex-end;gap:4px;height:120px;padding:0 4px}
+.tbar{display:flex;flex-direction:column;align-items:center;flex:1}
+.tbar-fill{width:100%;background:#6c63ff;border-radius:4px 4px 0 0;min-height:2px;transition:height .3s;position:relative}
+.tbar-fill:hover{filter:brightness(1.3)}
+.tbar-fill .tbar-tip{display:none;position:absolute;bottom:100%;left:50%;transform:translateX(-50%);background:#000;color:#fff;padding:4px 8px;border-radius:4px;font-size:10px;white-space:nowrap;margin-bottom:4px}
+.tbar-fill:hover .tbar-tip{display:block}
+.tbar-label{font-size:9px;color:#444;margin-top:4px;writing-mode:vertical-rl;text-orientation:mixed;max-height:50px;overflow:hidden}
+.content-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;padding:0 40px 24px}
+.section-card{background:#161822;border:1px solid #2a2d3a;border-radius:12px;padding:24px;overflow:hidden}
+.section-card h3{font-size:12px;color:#6c63ff;text-transform:uppercase;letter-spacing:1px;margin-bottom:14px;display:flex;align-items:center;gap:6px}
+.section-card .sc-body{font-size:13px;line-height:1.65;color:#ccc}
+.section-card .sc-body strong{color:#fff}
+
+/* ─── CLICKABLE IDEA CARDS ─── */
+.idea-card{background:#1a1d2e;border-radius:8px;margin:10px 0;border-left:3px solid #6c63ff;overflow:hidden;transition:border-color .2s}
+.idea-card:hover{border-left-color:#a29bfe}
+.idea-top{padding:14px 16px;cursor:pointer;transition:background .15s}
+.idea-top:hover{background:#22263a}
+.ic-title{font-weight:600;color:#fff;font-size:14px;margin-bottom:4px;display:flex;align-items:center;justify-content:space-between}
+.ic-title .ic-arrow{font-size:10px;color:#555;transition:transform .2s}
+.idea-card.open .ic-title .ic-arrow{transform:rotate(90deg);color:#6c63ff}
+.ic-why{font-size:12px;color:#777;line-height:1.4}
+.ic-points{margin-top:8px;display:none}
+.idea-card.open .ic-points{display:block}
+.ic-point{font-size:12px;color:#999;line-height:1.5;padding:2px 0 2px 8px}
+.idea-actions{display:none;padding:0 16px 14px;gap:10px}
+.idea-card.open .idea-actions{display:flex}
+.idea-btn{flex:1;padding:14px;border-radius:10px;border:1px solid #2a2d3a;background:#161822;color:#bbb;font-size:12px;cursor:pointer;transition:all .15s;text-align:center;font-weight:500}
+.idea-btn:hover{background:#2a2d3a;color:#fff;border-color:#6c63ff}
+.idea-btn.active{border-color:#6c63ff;background:#1a1d40;color:#fff}
+.idea-btn.loading{opacity:.6;pointer-events:none}
+.btn-icon{font-size:20px;display:block;margin-bottom:6px}
+.btn-label{font-size:11px;color:#666;margin-top:2px}
+.idea-result{display:none;padding:0 16px 16px}
+.idea-card.has-result .idea-result{display:block}
+.result-content{background:#12141f;border:1px solid #2a2d3a;border-radius:8px;padding:16px 18px;font-size:13px;line-height:1.7;color:#ccc;max-height:600px;overflow-y:auto}
+.result-content h4{color:#6c63ff;font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin:14px 0 6px;font-weight:700}
+.result-content h4:first-child{margin-top:0}
+.result-content strong{color:#fff}
+.result-content em{color:#a9a3ff;font-style:normal}
+.post-block{background:#1a1d2e;border-radius:6px;padding:12px 14px;margin:8px 0;border-left:2px solid #4a4580;font-size:12px;white-space:pre-wrap;line-height:1.6}
+.post-platform{font-size:10px;color:#6c63ff;text-transform:uppercase;font-weight:700;letter-spacing:1px;margin-bottom:6px}
+.result-tabs{display:flex;gap:6px;margin-bottom:12px}
+.result-tab{padding:6px 14px;border-radius:6px;font-size:11px;cursor:pointer;background:#1a1d2e;color:#666;border:1px solid #2a2d3a;transition:all .15s}
+.result-tab.active{background:#6c63ff;color:#fff;border-color:#6c63ff}
+
+/* Platform accordion boxes */
+.platform-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.plat-box{background:#1a1d2e;border-radius:10px;border:1px solid #2a2d3a;overflow:hidden;cursor:pointer;transition:all .2s}
+.plat-box:hover{border-color:var(--plat-color,#6c63ff)}
+.plat-box.open{grid-column:span 3;cursor:default}
+.plat-box.open .plat-header{border-bottom:1px solid #2a2d3a}
+.plat-header{padding:14px 16px;display:flex;align-items:center;gap:10px;transition:background .15s}
+.plat-header:hover{background:#22263a}
+.plat-icon{font-size:22px}
+.plat-name{font-size:13px;font-weight:600;color:#ddd;flex:1}
+.plat-arrow{font-size:10px;color:#555;transition:transform .2s}
+.plat-box.open .plat-arrow{transform:rotate(90deg);color:var(--plat-color,#6c63ff)}
+.plat-body{display:none;padding:12px 16px}
+.plat-box.open .plat-body{display:block}
+
+.video-item{padding:10px 14px;background:#1a1d2e;border-radius:8px;margin-bottom:8px;cursor:pointer;transition:background .15s;display:flex;justify-content:space-between;align-items:center}
+.video-item:hover{background:#22263a}
+.vi-left{flex:1}
+.vi-title{font-size:13px;color:#ddd;line-height:1.3}
+.vi-meta{font-size:11px;color:#555;margin-top:3px}
+.vi-views{color:#6c63ff}
+.vi-date{font-size:11px;color:#444;white-space:nowrap;margin-left:16px}
+.badge{display:inline-block;padding:3px 12px;border-radius:12px;font-size:12px;font-weight:600}
+.badge.rising{background:#1a3a2a;color:#6bcb77}
+.badge.declining{background:#3a1a1a;color:#ff6b6b}
+.badge.dormant{background:#3a3a1a;color:#ffd93d}
+.badge.steady{background:#1a2a3a;color:#6ba3cb}
+.spinner{display:inline-block;width:18px;height:18px;border:2px solid #333;border-top-color:#6c63ff;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ai-loading{text-align:center;padding:20px;color:#555}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1><span>TrueInfluence</span>AI — SunnyLenarduzzi</h1>
+  <div class="hstats">
+    <span>Videos: <b>50</b></span>
+    <span>Topics: <b>30</b></span>
+    <span>Avg Views: <b>51,563</b></span>
+    
+  </div>
+</div>
+
+<div id="treemapView"></div>
+<div id="topicView" class="hidden"></div>
+
+<script>
+const TOPICS = [{"name": "Monetization", "count": 23, "avg_views": 39144, "timeline": {"recent": 23, "middle": 0, "older": 0}, "videos": [{"title": "How \"Average\" People Are Making Millions On YouTube", "views": 32802, "url": "https://www.youtube.com/watch?v=EcZR9FVC9O8", "published": "", "approx_date": "", "position": 0}, {"title": "The Ultimate Guide To Make $100k With Online Courses (In 2026)", "views": 8787, "url": "https://www.youtube.com/watch?v=3dAajpiLLks", "published": "", "approx_date": "", "position": 0}, {"title": "The Blueprint To Make Money On YouTube From Day 1 (Updated For 2026)", "views": 38215, "url": "https://www.youtube.com/watch?v=nQ9sFK4zBL0", "published": "", "approx_date": "", "position": 0}, {"title": "The Smartest Way To Make $10k/Mo (Without Working More Hours)", "views": 7325, "url": "https://www.youtube.com/watch?v=oM3Ph0b56mw", "published": "", "approx_date": "", "position": 0}, {"title": "I Make $5M/Yr With Online Courses (Why 94% Fail)", "views": 12438, "url": "https://www.youtube.com/watch?v=dnZKOjvyA5w", "published": "", "approx_date": "", "position": 0}, {"title": "How to Create a $5,000+ Online Course THAT SELLS", "views": 14531, "url": "https://www.youtube.com/watch?v=-LaY2yerqHo", "published": "", "approx_date": "", "position": 0}, {"title": "He Turned $997 into a $1M Business With No Experience", "views": 9128, "url": "https://www.youtube.com/watch?v=9ZdypLjtrzU", "published": "", "approx_date": "", "position": 0}, {"title": "The Exact Checklist Behind Our Clients $100K Months", "views": 9371, "url": "https://www.youtube.com/watch?v=h_uoe_BGeHQ", "published": "", "approx_date": "", "position": 0}, {"title": "How They Make $100k/Mo From One YouTube Video (No Ads)", "views": 17027, "url": "https://www.youtube.com/watch?v=qR0XDtQNIJA", "published": "", "approx_date": "", "position": 0}, {"title": "How I Make $500k/Mo On YouTube", "views": 13742, "url": "https://www.youtube.com/watch?v=2n3F7naq46s", "published": "", "approx_date": "", "position": 0}, {"title": "The AI-Powered Business Plan To Earn on YouTube From Day 1", "views": 30415, "url": "https://www.youtube.com/watch?v=ih_gFJfZ8RU", "published": "", "approx_date": "", "position": 0}, {"title": "How I\u2019d Make $100k a Year (Working Only 5 Hours a Week)", "views": 21973, "url": "https://www.youtube.com/watch?v=hr95gLLycDI", "published": "", "approx_date": "", "position": 0}, {"title": "How a Simple Google Doc Made $67k In 30 Days", "views": 43350, "url": "https://www.youtube.com/watch?v=MLgrZZRfcE4", "published": "", "approx_date": "", "position": 0}, {"title": "Small Channel Sales Funnel: How to Make $$$ On YouTube On Day 1", "views": 19209, "url": "https://www.youtube.com/watch?v=0K5ZeNbUGgA", "published": "", "approx_date": "", "position": 0}, {"title": "How I Make $18k Every Month From a Video With 7,000 Views", "views": 22194, "url": "https://www.youtube.com/watch?v=ZKxD1I_oOFk", "published": "", "approx_date": "", "position": 0}, {"title": "How I Make $500K/Month Without Social Media", "views": 327249, "url": "https://www.youtube.com/watch?v=jQAxjKuJcBA", "published": "", "approx_date": "", "position": 0}, {"title": "The Smartest Way to Make Money on YouTube from Day One", "views": 103997, "url": "https://www.youtube.com/watch?v=m9eMEabVKDY", "published": "", "approx_date": "", "position": 0}, {"title": "Monetizing YouTube the Smart Way (Without a Big Audience)", "views": 13632, "url": "https://www.youtube.com/watch?v=Szb3OW9IkJE", "published": "", "approx_date": "", "position": 0}, {"title": "The AI Strategy that Made $210k in 55 days with No Audience", "views": 39160, "url": "https://www.youtube.com/watch?v=F-M-UUju0pI", "published": "", "approx_date": "", "position": 0}, {"title": "They Made $211M through YouTube (Without Going Viral)", "views": 11099, "url": "https://www.youtube.com/watch?v=EjaQ3ECSq6U", "published": "", "approx_date": "", "position": 0}, {"title": "The Online Business That\u2019s Quietly Making People Millions", "views": 20880, "url": "https://www.youtube.com/watch?v=A377PjIJmzM", "published": "", "approx_date": "", "position": 0}, {"title": "How to Make $89k from a Course Before It Launches", "views": 31862, "url": "https://www.youtube.com/watch?v=SY99hmIJEJs", "published": "", "approx_date": "", "position": 0}, {"title": "How To Build & Sell An Online Course With No Experience", "views": 51930, "url": "https://www.youtube.com/watch?v=4OBCh3A5CWI", "published": "", "approx_date": "", "position": 0}]}, {"name": "Content Strategy", "count": 20, "avg_views": 44127, "timeline": {"recent": 20, "middle": 0, "older": 0}, "videos": [{"title": "The Smartest Way To Turn Your Expertise Into $1M", "views": 48638, "url": "https://www.youtube.com/watch?v=fN_2c_LPfX0", "published": "", "approx_date": "", "position": 0}, {"title": "Why I Burned Down & Relaunched My Business with AI", "views": 6961, "url": "https://www.youtube.com/watch?v=EG3YlrpWNM4", "published": "", "approx_date": "", "position": 0}, {"title": "The Blueprint To Make Money On YouTube From Day 1 (Updated For 2026)", "views": 38215, "url": "https://www.youtube.com/watch?v=nQ9sFK4zBL0", "published": "", "approx_date": "", "position": 0}, {"title": "The Anti-Social Media Strategy That Will Grow Your Business", "views": 106992, "url": "https://www.youtube.com/watch?v=rpDFoSc7gRY", "published": "", "approx_date": "", "position": 0}, {"title": "How to Build a $10K/Month Business Before The Year Ends", "views": 55593, "url": "https://www.youtube.com/watch?v=VL-o9Kx0Tv8", "published": "", "approx_date": "", "position": 0}, {"title": "How I Make $5M/Year Working Only 4hrs a Day", "views": 25799, "url": "https://www.youtube.com/watch?v=f0yWDgeNPBM", "published": "", "approx_date": "", "position": 0}, {"title": "I Make $5M/Yr With Online Courses (Why 94% Fail)", "views": 12438, "url": "https://www.youtube.com/watch?v=dnZKOjvyA5w", "published": "", "approx_date": "", "position": 0}, {"title": "I'm Starting Over Again From Zero...", "views": 29555, "url": "https://www.youtube.com/watch?v=S1qJXpH7rPw", "published": "", "approx_date": "", "position": 0}, {"title": "Watch Me Create a $1M Business (With No Social Media)", "views": 13480, "url": "https://www.youtube.com/watch?v=1YJ44BrTg90", "published": "", "approx_date": "", "position": 0}, {"title": "How to Create a $5,000+ Online Course THAT SELLS", "views": 14531, "url": "https://www.youtube.com/watch?v=-LaY2yerqHo", "published": "", "approx_date": "", "position": 0}, {"title": "He Turned $997 into a $1M Business With No Experience", "views": 9128, "url": "https://www.youtube.com/watch?v=9ZdypLjtrzU", "published": "", "approx_date": "", "position": 0}, {"title": "How I Make $18k Every Month From a Video With 7,000 Views", "views": 22194, "url": "https://www.youtube.com/watch?v=ZKxD1I_oOFk", "published": "", "approx_date": "", "position": 0}, {"title": "The YouTube System That Attracts Clients While You Sleep", "views": 12001, "url": "https://www.youtube.com/watch?v=VGXo407dyYU", "published": "", "approx_date": "", "position": 0}, {"title": "How I Make $500K/Month Without Social Media", "views": 327249, "url": "https://www.youtube.com/watch?v=jQAxjKuJcBA", "published": "", "approx_date": "", "position": 0}, {"title": "Monetizing YouTube the Smart Way (Without a Big Audience)", "views": 13632, "url": "https://www.youtube.com/watch?v=Szb3OW9IkJE", "published": "", "approx_date": "", "position": 0}, {"title": "They Made $211M through YouTube (Without Going Viral)", "views": 11099, "url": "https://www.youtube.com/watch?v=EjaQ3ECSq6U", "published": "", "approx_date": "", "position": 0}, {"title": "10 Years of Making Millions on YouTube in 20 Minutes", "views": 19560, "url": "https://www.youtube.com/watch?v=U0SJyGr4h44", "published": "", "approx_date": "", "position": 0}, {"title": "Watch me Create a $1M YouTube Channel in 38 Minutes (Using AI)", "views": 59961, "url": "https://www.youtube.com/watch?v=swBwRtHVVlA", "published": "", "approx_date": "", "position": 0}, {"title": "The No-Subscriber Method to Earning Big $$$ on YouTube", "views": 28005, "url": "https://www.youtube.com/watch?v=l9YlmS_Dpw8", "published": "", "approx_date": "", "position": 0}, {"title": "Under 100 Subs? Here\u2019s How To Make $250k With A Micro Channel", "views": 27527, "url": "https://www.youtube.com/watch?v=6BoI58oGVvc", "published": "", "approx_date": "", "position": 0}]}, {"name": "Business Strategy", "count": 15, "avg_views": 0, "timeline": {"recent": 15, "middle": 0, "older": 0}, "videos": [{"title": "How \"Average\" People Are Making Millions On YouTube", "views": 32802, "url": "https://www.youtube.com/watch?v=EcZR9FVC9O8", "published": "", "approx_date": "", "position": 0}, {"title": "The Ultimate Guide To Make $100k With Online Courses (In 2026)", "views": 8787, "url": "https://www.youtube.com/watch?v=3dAajpiLLks", "published": "", "approx_date": "", "position": 0}, {"title": "How I Use Google Docs To Run My $5M/Year Business", "views": 11299, "url": "https://www.youtube.com/watch?v=8zgOgiWX_vM", "published": "", "approx_date": "", "position": 0}, {"title": "The Boring Way to Make $1M (Using Skills You Already Have)", "views": 6615, "url": "https://www.youtube.com/watch?v=vDOUeWRE6Zs", "published": "", "approx_date": "", "position": 0}, {"title": "The Smartest Way To Turn Your Expertise Into $1M", "views": 48638, "url": "https://www.youtube.com/watch?v=fN_2c_LPfX0", "published": "", "approx_date": "", "position": 0}, {"title": "harsh truths no one tells you about building a $1M business", "views": 7975, "url": "https://www.youtube.com/watch?v=kn3V3DV2QMA", "published": "", "approx_date": "", "position": 0}, {"title": "Why I Burned Down & Relaunched My Business with AI", "views": 6961, "url": "https://www.youtube.com/watch?v=EG3YlrpWNM4", "published": "", "approx_date": "", "position": 0}, {"title": "If I Had To Create an Online Business From Scratch, Here\u2019s What I\u2019d Do", "views": 8879, "url": "https://www.youtube.com/watch?v=TEfDKZw3eJg", "published": "", "approx_date": "", "position": 0}, {"title": "My Strategy To Work Less (And Earn More) In 2026", "views": 4915, "url": "https://www.youtube.com/watch?v=8jjnEBdiLYI", "published": "", "approx_date": "", "position": 0}, {"title": "The Exact Checklist Behind Our Clients $100K Months", "views": 9371, "url": "https://www.youtube.com/watch?v=h_uoe_BGeHQ", "published": "", "approx_date": "", "position": 0}, {"title": "How I Built A $30M Business (That Runs Itself)", "views": 11460, "url": "https://www.youtube.com/watch?v=vuDYmYn92CI", "published": "", "approx_date": "", "position": 0}, {"title": "How I\u2019d Make $100k a Year (Working Only 5 Hours a Week)", "views": 21973, "url": "https://www.youtube.com/watch?v=hr95gLLycDI", "published": "", "approx_date": "", "position": 0}, {"title": "How a Simple Google Doc Made $67k In 30 Days", "views": 43350, "url": "https://www.youtube.com/watch?v=MLgrZZRfcE4", "published": "", "approx_date": "", "position": 0}, {"title": "The Online Business That\u2019s Quietly Making People Millions", "views": 20880, "url": "https://www.youtube.com/watch?v=A377PjIJmzM", "published": "", "approx_date": "", "position": 0}, {"title": "How To Build & Sell An Online Course With No Experience", "views": 51930, "url": "https://www.youtube.com/watch?v=4OBCh3A5CWI", "published": "", "approx_date": "", "position": 0}]}, {"name": "Business Growth", "count": 15, "avg_views": 49317, "timeline": {"recent": 15, "middle": 0, "older": 0}, "videos": [{"title": "Social Media is Over, Here's What Will Grow Your Business", "views": 231194, "url": "https://www.youtube.com/watch?v=7pKRGZYyy9Y", "published": "", "approx_date": "", "position": 0}, {"title": "The Blueprint To Make Money On YouTube From Day 1 (Updated For 2026)", "views": 38215, "url": "https://www.youtube.com/watch?v=nQ9sFK4zBL0", "published": "", "approx_date": "", "position": 0}, {"title": "The Anti-Social Media Strategy That Will Grow Your Business", "views": 106992, "url": "https://www.youtube.com/watch?v=rpDFoSc7gRY", "published": "", "approx_date": "", "position": 0}, {"title": "How to Build a $10K/Month Business Before The Year Ends", "views": 55593, "url": "https://www.youtube.com/watch?v=VL-o9Kx0Tv8", "published": "", "approx_date": "", "position": 0}, {"title": "The Smartest Way To Make $10k/Mo (Without Working More Hours)", "views": 7325, "url": "https://www.youtube.com/watch?v=oM3Ph0b56mw", "published": "", "approx_date": "", "position": 0}, {"title": "How I Make $5M/Year Working Only 4hrs a Day", "views": 25799, "url": "https://www.youtube.com/watch?v=f0yWDgeNPBM", "published": "", "approx_date": "", "position": 0}, {"title": "I Make $5M/Yr With Online Courses (Why 94% Fail)", "views": 12438, "url": "https://www.youtube.com/watch?v=dnZKOjvyA5w", "published": "", "approx_date": "", "position": 0}, {"title": "I'm Starting Over Again From Zero...", "views": 29555, "url": "https://www.youtube.com/watch?v=S1qJXpH7rPw", "published": "", "approx_date": "", "position": 0}, {"title": "Watch Me Create a $1M Business (With No Social Media)", "views": 13480, "url": "https://www.youtube.com/watch?v=1YJ44BrTg90", "published": "", "approx_date": "", "position": 0}, {"title": "How to Create a $5,000+ Online Course THAT SELLS", "views": 14531, "url": "https://www.youtube.com/watch?v=-LaY2yerqHo", "published": "", "approx_date": "", "position": 0}, {"title": "He Turned $997 into a $1M Business With No Experience", "views": 9128, "url": "https://www.youtube.com/watch?v=9ZdypLjtrzU", "published": "", "approx_date": "", "position": 0}, {"title": "The YouTube System That Attracts Clients While You Sleep", "views": 12001, "url": "https://www.youtube.com/watch?v=VGXo407dyYU", "published": "", "approx_date": "", "position": 0}, {"title": "The Smartest Way to Make Money on YouTube from Day One", "views": 103997, "url": "https://www.youtube.com/watch?v=m9eMEabVKDY", "published": "", "approx_date": "", "position": 0}, {"title": "10 Years of Making Millions on YouTube in 20 Minutes", "views": 19560, "url": "https://www.youtube.com/watch?v=U0SJyGr4h44", "published": "", "approx_date": "", "position": 0}, {"title": "Watch me Create a $1M YouTube Channel in 38 Minutes (Using AI)", "views": 59961, "url": "https://www.youtube.com/watch?v=swBwRtHVVlA", "published": "", "approx_date": "", "position": 0}]}, {"name": "Online Business", "count": 14, "avg_views": 0, "timeline": {"recent": 14, "middle": 0, "older": 0}, "videos": [{"title": "How I Use Google Docs To Run My $5M/Year Business", "views": 11299, "url": "https://www.youtube.com/watch?v=8zgOgiWX_vM", "published": "", "approx_date": "", "position": 0}, {"title": "The Boring Way to Make $1M (Using Skills You Already Have)", "views": 6615, "url": "https://www.youtube.com/watch?v=vDOUeWRE6Zs", "published": "", "approx_date": "", "position": 0}, {"title": "If I Had To Create an Online Business From Scratch, Here\u2019s What I\u2019d Do", "views": 8879, "url": "https://www.youtube.com/watch?v=TEfDKZw3eJg", "published": "", "approx_date": "", "position": 0}, {"title": "The Exact Checklist Behind Our Clients $100K Months", "views": 9371, "url": "https://www.youtube.com/watch?v=h_uoe_BGeHQ", "published": "", "approx_date": "", "position": 0}, {"title": "How They Make $100k/Mo From One YouTube Video (No Ads)", "views": 17027, "url": "https://www.youtube.com/watch?v=qR0XDtQNIJA", "published": "", "approx_date": "", "position": 0}, {"title": "How I Make $500k/Mo On YouTube", "views": 13742, "url": "https://www.youtube.com/watch?v=2n3F7naq46s", "published": "", "approx_date": "", "position": 0}, {"title": "Unknown", "views": 0, "url": "", "published": "", "approx_date": "", "position": 0}, {"title": "How She Built a $600K Online Course in 5 Hours a Day", "views": 25505, "url": "https://www.youtube.com/watch?v=kXLtVkx5FeI", "published": "", "approx_date": "", "position": 0}, {"title": "How I Built A $30M Business (That Runs Itself)", "views": 11460, "url": "https://www.youtube.com/watch?v=vuDYmYn92CI", "published": "", "approx_date": "", "position": 0}, {"title": "The AI-Powered Business Plan To Earn on YouTube From Day 1", "views": 30415, "url": "https://www.youtube.com/watch?v=ih_gFJfZ8RU", "published": "", "approx_date": "", "position": 0}, {"title": "I Quit Social Media....Now My Business Makes $5M/Yr", "views": 17268, "url": "https://www.youtube.com/watch?v=cNjQrPiLMbw", "published": "", "approx_date": "", "position": 0}, {"title": "How I\u2019d Make $100k a Year (Working Only 5 Hours a Week)", "views": 21973, "url": "https://www.youtube.com/watch?v=hr95gLLycDI", "published": "", "approx_date": "", "position": 0}, {"title": "Your Coaching Business is Keeping You Broke (Do This Instead)", "views": 10175, "url": "https://www.youtube.com/watch?v=QVvoFGZV_bo", "published": "", "approx_date": "", "position": 0}, {"title": "The One-Person Business Model that Makes me Millions & Brings me Peace", "views": 28930, "url": "https://www.youtube.com/watch?v=Vdxp0oRaliU", "published": "", "approx_date": "", "position": 0}]}, {"name": "Entrepreneurship", "count": 14, "avg_views": 0, "timeline": {"recent": 14, "middle": 0, "older": 0}, "videos": [{"title": "harsh truths no one tells you about building a $1M business", "views": 7975, "url": "https://www.youtube.com/watch?v=kn3V3DV2QMA", "published": "", "approx_date": "", "position": 0}, {"title": "How She Built a $600K Online Course in 5 Hours a Day", "views": 25505, "url": "https://www.youtube.com/watch?v=kXLtVkx5FeI", "published": "", "approx_date": "", "position": 0}, {"title": "How I Built A $30M Business (That Runs Itself)", "views": 11460, "url": "https://www.youtube.com/watch?v=vuDYmYn92CI", "published": "", "approx_date": "", "position": 0}, {"title": "I Quit Social Media....Now My Business Makes $5M/Yr", "views": 17268, "url": "https://www.youtube.com/watch?v=cNjQrPiLMbw", "published": "", "approx_date": "", "position": 0}, {"title": "Your Coaching Business is Keeping You Broke (Do This Instead)", "views": 10175, "url": "https://www.youtube.com/watch?v=QVvoFGZV_bo", "published": "", "approx_date": "", "position": 0}, {"title": "10 Years of Making Millions on YouTube in 20 Minutes", "views": 19560, "url": "https://www.youtube.com/watch?v=U0SJyGr4h44", "published": "", "approx_date": "", "position": 0}, {"title": "How This $15 Book Made Me a Millionaire", "views": 17724, "url": "https://www.youtube.com/watch?v=sD40Km1Xb-Q", "published": "", "approx_date": "", "position": 0}, {"title": "Watch me Create a $1M YouTube Channel in 38 Minutes (Using AI)", "views": 59961, "url": "https://www.youtube.com/watch?v=swBwRtHVVlA", "published": "", "approx_date": "", "position": 0}, {"title": "The One-Person Business Model that Makes me Millions & Brings me Peace", "views": 28930, "url": "https://www.youtube.com/watch?v=Vdxp0oRaliU", "published": "", "approx_date": "", "position": 0}, {"title": "The No-Subscriber Method to Earning Big $$$ on YouTube", "views": 28005, "url": "https://www.youtube.com/watch?v=l9YlmS_Dpw8", "published": "", "approx_date": "", "position": 0}, {"title": "How to Make $89k from a Course Before It Launches", "views": 31862, "url": "https://www.youtube.com/watch?v=SY99hmIJEJs", "published": "", "approx_date": "", "position": 0}, {"title": "Give Me 15 Minutes I\u2019ll Turn Your Self-Doubt Into Unshakeable Confidence", "views": 15529, "url": "https://www.youtube.com/watch?v=-19nb0nAwEY", "published": "", "approx_date": "", "position": 0}, {"title": "How To Build & Sell An Online Course With No Experience", "views": 51930, "url": "https://www.youtube.com/watch?v=4OBCh3A5CWI", "published": "", "approx_date": "", "position": 0}, {"title": "Under 100 Subs? Here\u2019s How To Make $250k With A Micro Channel", "views": 27527, "url": "https://www.youtube.com/watch?v=6BoI58oGVvc", "published": "", "approx_date": "", "position": 0}]}, {"name": "Mindset", "count": 9, "avg_views": 30779, "timeline": {"recent": 9, "middle": 0, "older": 0}, "videos": [{"title": "harsh truths no one tells you about building a $1M business", "views": 7975, "url": "https://www.youtube.com/watch?v=kn3V3DV2QMA", "published": "", "approx_date": "", "position": 0}, {"title": "My Strategy To Work Less (And Earn More) In 2026", "views": 4915, "url": "https://www.youtube.com/watch?v=8jjnEBdiLYI", "published": "", "approx_date": "", "position": 0}, {"title": "The Anti-Social Media Strategy That Will Grow Your Business", "views": 106992, "url": "https://www.youtube.com/watch?v=rpDFoSc7gRY", "published": "", "approx_date": "", "position": 0}, {"title": "How to Build a $10K/Month Business Before The Year Ends", "views": 55593, "url": "https://www.youtube.com/watch?v=VL-o9Kx0Tv8", "published": "", "approx_date": "", "position": 0}, {"title": "How I Make $5M/Year Working Only 4hrs a Day", "views": 25799, "url": "https://www.youtube.com/watch?v=f0yWDgeNPBM", "published": "", "approx_date": "", "position": 0}, {"title": "I'm Starting Over Again From Zero...", "views": 29555, "url": "https://www.youtube.com/watch?v=S1qJXpH7rPw", "published": "", "approx_date": "", "position": 0}, {"title": "How To Get Ahead Of 99% Of People In The AI Revolution", "views": 12929, "url": "https://www.youtube.com/watch?v=dYGxliLsjCo", "published": "", "approx_date": "", "position": 0}, {"title": "How This $15 Book Made Me a Millionaire", "views": 17724, "url": "https://www.youtube.com/watch?v=sD40Km1Xb-Q", "published": "", "approx_date": "", "position": 0}, {"title": "Give Me 15 Minutes I\u2019ll Turn Your Self-Doubt Into Unshakeable Confidence", "views": 15529, "url": "https://www.youtube.com/watch?v=-19nb0nAwEY", "published": "", "approx_date": "", "position": 0}]}, {"name": "Client Acquisition", "count": 9, "avg_views": 28905, "timeline": {"recent": 9, "middle": 0, "older": 0}, "videos": [{"title": "The Exact Checklist Behind Our Clients $100K Months", "views": 9371, "url": "https://www.youtube.com/watch?v=h_uoe_BGeHQ", "published": "", "approx_date": "", "position": 0}, {"title": "How They Make $100k/Mo From One YouTube Video (No Ads)", "views": 17027, "url": "https://www.youtube.com/watch?v=qR0XDtQNIJA", "published": "", "approx_date": "", "position": 0}, {"title": "How I Make $500k/Mo On YouTube", "views": 13742, "url": "https://www.youtube.com/watch?v=2n3F7naq46s", "published": "", "approx_date": "", "position": 0}, {"title": "Unknown", "views": 0, "url": "", "published": "", "approx_date": "", "position": 0}, {"title": "The AI-Powered Business Plan To Earn on YouTube From Day 1", "views": 30415, "url": "https://www.youtube.com/watch?v=ih_gFJfZ8RU", "published": "", "approx_date": "", "position": 0}, {"title": "The YouTube System That Attracts Clients While You Sleep", "views": 12001, "url": "https://www.youtube.com/watch?v=VGXo407dyYU", "published": "", "approx_date": "", "position": 0}, {"title": "The Smartest Way to Make Money on YouTube from Day One", "views": 103997, "url": "https://www.youtube.com/watch?v=m9eMEabVKDY", "published": "", "approx_date": "", "position": 0}, {"title": "Monetizing YouTube the Smart Way (Without a Big Audience)", "views": 13632, "url": "https://www.youtube.com/watch?v=Szb3OW9IkJE", "published": "", "approx_date": "", "position": 0}, {"title": "Watch me Create a $1M YouTube Channel in 38 Minutes (Using AI)", "views": 59961, "url": "https://www.youtube.com/watch?v=swBwRtHVVlA", "published": "", "approx_date": "", "position": 0}]}, {"name": "Productivity", "count": 7, "avg_views": 0, "timeline": {"recent": 7, "middle": 0, "older": 0}, "videos": [{"title": "How I Use Google Docs To Run My $5M/Year Business", "views": 11299, "url": "https://www.youtube.com/watch?v=8zgOgiWX_vM", "published": "", "approx_date": "", "position": 0}, {"title": "My Strategy To Work Less (And Earn More) In 2026", "views": 4915, "url": "https://www.youtube.com/watch?v=8jjnEBdiLYI", "published": "", "approx_date": "", "position": 0}, {"title": "The Exact Checklist Behind Our Clients $100K Months", "views": 9371, "url": "https://www.youtube.com/watch?v=h_uoe_BGeHQ", "published": "", "approx_date": "", "position": 0}, {"title": "How She Built a $600K Online Course in 5 Hours a Day", "views": 25505, "url": "https://www.youtube.com/watch?v=kXLtVkx5FeI", "published": "", "approx_date": "", "position": 0}, {"title": "How I Built A $30M Business (That Runs Itself)", "views": 11460, "url": "https://www.youtube.com/watch?v=vuDYmYn92CI", "published": "", "approx_date": "", "position": 0}, {"title": "How I\u2019d Make $100k a Year (Working Only 5 Hours a Week)", "views": 21973, "url": "https://www.youtube.com/watch?v=hr95gLLycDI", "published": "", "approx_date": "", "position": 0}, {"title": "Your Coaching Business is Keeping You Broke (Do This Instead)", "views": 10175, "url": "https://www.youtube.com/watch?v=QVvoFGZV_bo", "published": "", "approx_date": "", "position": 0}]}, {"name": "Youtube Strategy", "count": 6, "avg_views": 33501, "timeline": {"recent": 6, "middle": 0, "older": 0}, "videos": [{"title": "How They Make $100k/Mo From One YouTube Video (No Ads)", "views": 17027, "url": "https://www.youtube.com/watch?v=qR0XDtQNIJA", "published": "", "approx_date": "", "position": 0}, {"title": "How I Make $500k/Mo On YouTube", "views": 13742, "url": "https://www.youtube.com/watch?v=2n3F7naq46s", "published": "", "approx_date": "", "position": 0}, {"title": "The AI-Powered Business Plan To Earn on YouTube From Day 1", "views": 30415, "url": "https://www.youtube.com/watch?v=ih_gFJfZ8RU", "published": "", "approx_date": "", "position": 0}, {"title": "How I Make $18k Every Month From a Video With 7,000 Views", "views": 22194, "url": "https://www.youtube.com/watch?v=ZKxD1I_oOFk", "published": "", "approx_date": "", "position": 0}, {"title": "The Smartest Way to Make Money on YouTube from Day One", "views": 103997, "url": "https://www.youtube.com/watch?v=m9eMEabVKDY", "published": "", "approx_date": "", "position": 0}, {"title": "Monetizing YouTube the Smart Way (Without a Big Audience)", "views": 13632, "url": "https://www.youtube.com/watch?v=Szb3OW9IkJE", "published": "", "approx_date": "", "position": 0}]}, {"name": "Scalability", "count": 6, "avg_views": 0, "timeline": {"recent": 6, "middle": 0, "older": 0}, "videos": [{"title": "Unknown", "views": 0, "url": "", "published": "", "approx_date": "", "position": 0}, {"title": "How She Built a $600K Online Course in 5 Hours a Day", "views": 25505, "url": "https://www.youtube.com/watch?v=kXLtVkx5FeI", "published": "", "approx_date": "", "position": 0}, {"title": "How I Built A $30M Business (That Runs Itself)", "views": 11460, "url": "https://www.youtube.com/watch?v=vuDYmYn92CI", "published": "", "approx_date": "", "position": 0}, {"title": "I Quit Social Media....Now My Business Makes $5M/Yr", "views": 17268, "url": "https://www.youtube.com/watch?v=cNjQrPiLMbw", "published": "", "approx_date": "", "position": 0}, {"title": "How I\u2019d Make $100k a Year (Working Only 5 Hours a Week)", "views": 21973, "url": "https://www.youtube.com/watch?v=hr95gLLycDI", "published": "", "approx_date": "", "position": 0}, {"title": "Your Coaching Business is Keeping You Broke (Do This Instead)", "views": 10175, "url": "https://www.youtube.com/watch?v=QVvoFGZV_bo", "published": "", "approx_date": "", "position": 0}]}, {"name": "Online Courses", "count": 5, "avg_views": 32760, "timeline": {"recent": 5, "middle": 0, "older": 0}, "videos": [{"title": "The Ultimate Guide To Make $100k With Online Courses (In 2026)", "views": 8787, "url": "https://www.youtube.com/watch?v=3dAajpiLLks", "published": "", "approx_date": "", "position": 0}, {"title": "The Smartest Way To Turn Your Expertise Into $1M", "views": 48638, "url": "https://www.youtube.com/watch?v=fN_2c_LPfX0", "published": "", "approx_date": "", "position": 0}, {"title": "How a Simple Google Doc Made $67k In 30 Days", "views": 43350, "url": "https://www.youtube.com/watch?v=MLgrZZRfcE4", "published": "", "approx_date": "", "position": 0}, {"title": "They Made $211M through YouTube (Without Going Viral)", "views": 11099, "url": "https://www.youtube.com/watch?v=EjaQ3ECSq6U", "published": "", "approx_date": "", "position": 0}, {"title": "How To Build & Sell An Online Course With No Experience", "views": 51930, "url": "https://www.youtube.com/watch?v=4OBCh3A5CWI", "published": "", "approx_date": "", "position": 0}]}, {"name": "Course Launches", "count": 5, "avg_views": 0, "timeline": {"recent": 5, "middle": 0, "older": 0}, "videos": [{"title": "I Make $5M/Yr With Online Courses (Why 94% Fail)", "views": 12438, "url": "https://www.youtube.com/watch?v=dnZKOjvyA5w", "published": "", "approx_date": "", "position": 0}, {"title": "Watch Me Create a $1M Business (With No Social Media)", "views": 13480, "url": "https://www.youtube.com/watch?v=1YJ44BrTg90", "published": "", "approx_date": "", "position": 0}, {"title": "How to Create a $5,000+ Online Course THAT SELLS", "views": 14531, "url": "https://www.youtube.com/watch?v=-LaY2yerqHo", "published": "", "approx_date": "", "position": 0}, {"title": "He Turned $997 into a $1M Business With No Experience", "views": 9128, "url": "https://www.youtube.com/watch?v=9ZdypLjtrzU", "published": "", "approx_date": "", "position": 0}, {"title": "How to Make $89k from a Course Before It Launches", "views": 31862, "url": "https://www.youtube.com/watch?v=SY99hmIJEJs", "published": "", "approx_date": "", "position": 0}]}, {"name": "Audience Building", "count": 5, "avg_views": 41572, "timeline": {"recent": 5, "middle": 0, "older": 0}, "videos": [{"title": "Small Channel Sales Funnel: How to Make $$$ On YouTube On Day 1", "views": 19209, "url": "https://www.youtube.com/watch?v=0K5ZeNbUGgA", "published": "", "approx_date": "", "position": 0}, {"title": "The Smartest Way to Make Money on YouTube from Day One", "views": 103997, "url": "https://www.youtube.com/watch?v=m9eMEabVKDY", "published": "", "approx_date": "", "position": 0}, {"title": "Monetizing YouTube the Smart Way (Without a Big Audience)", "views": 13632, "url": "https://www.youtube.com/watch?v=Szb3OW9IkJE", "published": "", "approx_date": "", "position": 0}, {"title": "The AI Strategy that Made $210k in 55 days with No Audience", "views": 39160, "url": "https://www.youtube.com/watch?v=F-M-UUju0pI", "published": "", "approx_date": "", "position": 0}, {"title": "How to Make $89k from a Course Before It Launches", "views": 31862, "url": "https://www.youtube.com/watch?v=SY99hmIJEJs", "published": "", "approx_date": "", "position": 0}]}, {"name": "Youtube Monetization", "count": 4, "avg_views": 33763, "timeline": {"recent": 4, "middle": 0, "older": 0}, "videos": [{"title": "10 Years of Making Millions on YouTube in 20 Minutes", "views": 19560, "url": "https://www.youtube.com/watch?v=U0SJyGr4h44", "published": "", "approx_date": "", "position": 0}, {"title": "Watch me Create a $1M YouTube Channel in 38 Minutes (Using AI)", "views": 59961, "url": "https://www.youtube.com/watch?v=swBwRtHVVlA", "published": "", "approx_date": "", "position": 0}, {"title": "The No-Subscriber Method to Earning Big $$$ on YouTube", "views": 28005, "url": "https://www.youtube.com/watch?v=l9YlmS_Dpw8", "published": "", "approx_date": "", "position": 0}, {"title": "Under 100 Subs? Here\u2019s How To Make $250k With A Micro Channel", "views": 27527, "url": "https://www.youtube.com/watch?v=6BoI58oGVvc", "published": "", "approx_date": "", "position": 0}]}, {"name": "Product Development", "count": 3, "avg_views": 0, "timeline": {"recent": 3, "middle": 0, "older": 0}, "videos": [{"title": "The Ultimate Guide To Make $100k With Online Courses (In 2026)", "views": 8787, "url": "https://www.youtube.com/watch?v=3dAajpiLLks", "published": "", "approx_date": "", "position": 0}, {"title": "Why I Burned Down & Relaunched My Business with AI", "views": 6961, "url": "https://www.youtube.com/watch?v=EG3YlrpWNM4", "published": "", "approx_date": "", "position": 0}, {"title": "If I Had To Create an Online Business From Scratch, Here\u2019s What I\u2019d Do", "views": 8879, "url": "https://www.youtube.com/watch?v=TEfDKZw3eJg", "published": "", "approx_date": "", "position": 0}]}, {"name": "Personal Branding", "count": 3, "avg_views": 0, "timeline": {"recent": 3, "middle": 0, "older": 0}, "videos": [{"title": "The Boring Way to Make $1M (Using Skills You Already Have)", "views": 6615, "url": "https://www.youtube.com/watch?v=vDOUeWRE6Zs", "published": "", "approx_date": "", "position": 0}, {"title": "How To Get Ahead Of 99% Of People In The AI Revolution", "views": 12929, "url": "https://www.youtube.com/watch?v=dYGxliLsjCo", "published": "", "approx_date": "", "position": 0}, {"title": "10 Years of Making Millions on YouTube in 20 Minutes", "views": 19560, "url": "https://www.youtube.com/watch?v=U0SJyGr4h44", "published": "", "approx_date": "", "position": 0}]}, {"name": "Ai", "count": 3, "avg_views": 0, "timeline": {"recent": 3, "middle": 0, "older": 0}, "videos": [{"title": "The Smartest Way To Turn Your Expertise Into $1M", "views": 48638, "url": "https://www.youtube.com/watch?v=fN_2c_LPfX0", "published": "", "approx_date": "", "position": 0}, {"title": "Why I Burned Down & Relaunched My Business with AI", "views": 6961, "url": "https://www.youtube.com/watch?v=EG3YlrpWNM4", "published": "", "approx_date": "", "position": 0}, {"title": "The Smartest Way To Make $10k/Mo (Without Working More Hours)", "views": 7325, "url": "https://www.youtube.com/watch?v=oM3Ph0b56mw", "published": "", "approx_date": "", "position": 0}]}, {"name": "Business Building", "count": 3, "avg_views": 120180, "timeline": {"recent": 3, "middle": 0, "older": 0}, "videos": [{"title": "How I Make $18k Every Month From a Video With 7,000 Views", "views": 22194, "url": "https://www.youtube.com/watch?v=ZKxD1I_oOFk", "published": "", "approx_date": "", "position": 0}, {"title": "How I Make $500K/Month Without Social Media", "views": 327249, "url": "https://www.youtube.com/watch?v=jQAxjKuJcBA", "published": "", "approx_date": "", "position": 0}, {"title": "They Made $211M through YouTube (Without Going Viral)", "views": 11099, "url": "https://www.youtube.com/watch?v=EjaQ3ECSq6U", "published": "", "approx_date": "", "position": 0}]}, {"name": "Expertise", "count": 3, "avg_views": 30954, "timeline": {"recent": 3, "middle": 0, "older": 0}, "videos": [{"title": "How To Get Ahead Of 99% Of People In The AI Revolution", "views": 12929, "url": "https://www.youtube.com/watch?v=dYGxliLsjCo", "published": "", "approx_date": "", "position": 0}, {"title": "The No-Subscriber Method to Earning Big $$$ on YouTube", "views": 28005, "url": "https://www.youtube.com/watch?v=l9YlmS_Dpw8", "published": "", "approx_date": "", "position": 0}, {"title": "How To Build & Sell An Online Course With No Experience", "views": 51930, "url": "https://www.youtube.com/watch?v=4OBCh3A5CWI", "published": "", "approx_date": "", "position": 0}]}, {"name": "Youtube Growth", "count": 2, "avg_views": 0, "timeline": {"recent": 2, "middle": 0, "older": 0}, "videos": [{"title": "How \"Average\" People Are Making Millions On YouTube", "views": 32802, "url": "https://www.youtube.com/watch?v=EcZR9FVC9O8", "published": "", "approx_date": "", "position": 0}, {"title": "Small Channel Sales Funnel: How to Make $$$ On YouTube On Day 1", "views": 19209, "url": "https://www.youtube.com/watch?v=0K5ZeNbUGgA", "published": "", "approx_date": "", "position": 0}]}, {"name": "Scalable Assets", "count": 2, "avg_views": 0, "timeline": {"recent": 2, "middle": 0, "older": 0}, "videos": [{"title": "The Smartest Way To Make $10k/Mo (Without Working More Hours)", "views": 7325, "url": "https://www.youtube.com/watch?v=oM3Ph0b56mw", "published": "", "approx_date": "", "position": 0}, {"title": "How I Make $5M/Year Working Only 4hrs a Day", "views": 25799, "url": "https://www.youtube.com/watch?v=f0yWDgeNPBM", "published": "", "approx_date": "", "position": 0}]}, {"name": "Niche Marketing", "count": 2, "avg_views": 0, "timeline": {"recent": 2, "middle": 0, "older": 0}, "videos": [{"title": "How They Make $100k/Mo From One YouTube Video (No Ads)", "views": 17027, "url": "https://www.youtube.com/watch?v=qR0XDtQNIJA", "published": "", "approx_date": "", "position": 0}, {"title": "The No-Subscriber Method to Earning Big $$$ on YouTube", "views": 28005, "url": "https://www.youtube.com/watch?v=l9YlmS_Dpw8", "published": "", "approx_date": "", "position": 0}]}, {"name": "Lead Generation", "count": 2, "avg_views": 0, "timeline": {"recent": 2, "middle": 0, "older": 0}, "videos": [{"title": "How I Make $500k/Mo On YouTube", "views": 13742, "url": "https://www.youtube.com/watch?v=2n3F7naq46s", "published": "", "approx_date": "", "position": 0}, {"title": "How To Get Ahead Of 99% Of People In The AI Revolution", "views": 12929, "url": "https://www.youtube.com/watch?v=dYGxliLsjCo", "published": "", "approx_date": "", "position": 0}]}, {"name": "Coaching Business", "count": 2, "avg_views": 0, "timeline": {"recent": 2, "middle": 0, "older": 0}, "videos": [{"title": "Unknown", "views": 0, "url": "", "published": "", "approx_date": "", "position": 0}, {"title": "Your Coaching Business is Keeping You Broke (Do This Instead)", "views": 10175, "url": "https://www.youtube.com/watch?v=QVvoFGZV_bo", "published": "", "approx_date": "", "position": 0}]}, {"name": "Social Media Strategy", "count": 2, "avg_views": 0, "timeline": {"recent": 2, "middle": 0, "older": 0}, "videos": [{"title": "I Quit Social Media....Now My Business Makes $5M/Yr", "views": 17268, "url": "https://www.youtube.com/watch?v=cNjQrPiLMbw", "published": "", "approx_date": "", "position": 0}, {"title": "The YouTube System That Attracts Clients While You Sleep", "views": 12001, "url": "https://www.youtube.com/watch?v=VGXo407dyYU", "published": "", "approx_date": "", "position": 0}]}, {"name": "Knowledge Monetization", "count": 2, "avg_views": 174064, "timeline": {"recent": 2, "middle": 0, "older": 0}, "videos": [{"title": "How I Make $500K/Month Without Social Media", "views": 327249, "url": "https://www.youtube.com/watch?v=jQAxjKuJcBA", "published": "", "approx_date": "", "position": 0}, {"title": "The Online Business That\u2019s Quietly Making People Millions", "views": 20880, "url": "https://www.youtube.com/watch?v=A377PjIJmzM", "published": "", "approx_date": "", "position": 0}]}, {"name": "Client Clarity", "count": 2, "avg_views": 30020, "timeline": {"recent": 2, "middle": 0, "older": 0}, "videos": [{"title": "The AI Strategy that Made $210k in 55 days with No Audience", "views": 39160, "url": "https://www.youtube.com/watch?v=F-M-UUju0pI", "published": "", "approx_date": "", "position": 0}, {"title": "The Online Business That\u2019s Quietly Making People Millions", "views": 20880, "url": "https://www.youtube.com/watch?v=A377PjIJmzM", "published": "", "approx_date": "", "position": 0}]}, {"name": "Personal Development", "count": 2, "avg_views": 0, "timeline": {"recent": 2, "middle": 0, "older": 0}, "videos": [{"title": "How This $15 Book Made Me a Millionaire", "views": 17724, "url": "https://www.youtube.com/watch?v=sD40Km1Xb-Q", "published": "", "approx_date": "", "position": 0}, {"title": "Give Me 15 Minutes I\u2019ll Turn Your Self-Doubt Into Unshakeable Confidence", "views": 15529, "url": "https://www.youtube.com/watch?v=-19nb0nAwEY", "published": "", "approx_date": "", "position": 0}]}, {"name": "Audience Engagement", "count": 1, "avg_views": 32802, "timeline": {"recent": 1, "middle": 0, "older": 0}, "videos": [{"title": "How \"Average\" People Are Making Millions On YouTube", "views": 32802, "url": "https://www.youtube.com/watch?v=EcZR9FVC9O8", "published": "", "approx_date": "", "position": 0}]}];
+const QUOTES = {"Monetization": ["[How \"Average\" People Are Making Millions On YouTube]: Most people think that this is how YouTube works, but this belief is keeping smart people broke. Because the truth is, focusing on racking up views is actually costing you money. Let me show you something very weird. [music] So, look at the math. Whe", "[The Ultimate Guide To Make $100k With Online Courses (In 2026)]: We built a $5 million a year business helping people learn over 600 different niches create highly successful and impactful online coaching and online course businesses. So what's the real key here? Well, I can tell you with certainty and a lot of ex", "[The Blueprint To Make Money On YouTube From Day 1 (Updated For 2026)]: Take a guess at how many people are typing into the search bar every single day on this platform on YouTube. It's not 300,000. It's not 3 million. It's three billion. So what does that tell you? What's the significance behind that number? That tells ", "[The Smartest Way To Make $10k/Mo (Without Working More Hours)]: Can I really help you add an extra $10,000 per month to your business using AI without requiring you to work more hours? I know it sounds too good to be true, but I'm about to prove it to you. Using AI, we can create what I call scalable assets, busi", "[I Make $5M/Yr With Online Courses (Why 94% Fail)]: I've been in the online space for over a decade and I've watched thousands of course launches happen. Some make people millionaires and others well they crash and burn spectacularly. And after analyzing over a thousand failed course launches and seei"], "Content Strategy": ["[The Smartest Way To Turn Your Expertise Into $1M]: I'm about to say something that might feel like a punch in the gut. Traditional online courses are over. If your plan is to record videos, upload them to a platform, and just magically make money, you're playing a bit of a losing game. And I say that", "[Why I Burned Down & Relaunched My Business with AI]: I spent close to a decade developing methodology that has generated millions and millions of dollars and impacted thousands of people and it really worked like super super well. So naturally I thought to myself last year, why don't I just burn it all", "[The Blueprint To Make Money On YouTube From Day 1 (Updated For 2026)]: Take a guess at how many people are typing into the search bar every single day on this platform on YouTube. It's not 300,000. It's not 3 million. It's three billion. So what does that tell you? What's the significance behind that number? That tells ", "[The Anti-Social Media Strategy That Will Grow Your Business]: Social media is a lot like high school. There's the popular kids, the influencers, and for years, the same people that have been shouting from the rooftops to be posting every single day and post all the content that you can and literally share anyth", "[How to Build a $10K/Month Business Before The Year Ends]: Quick question. Let's picture 12 months from now. I want you to think about three things that you want to be different from your current reality. Because news flash, you have 10 weeks left in the year. 10 weeks. That's it. [music] That's all. So, I'm"], "Business Strategy": ["[How \"Average\" People Are Making Millions On YouTube]: Most people think that this is how YouTube works, but this belief is keeping smart people broke. Because the truth is, focusing on racking up views is actually costing you money. Let me show you something very weird. [music] So, look at the math. Whe", "[The Ultimate Guide To Make $100k With Online Courses (In 2026)]: We built a $5 million a year business helping people learn over 600 different niches create highly successful and impactful online coaching and online course businesses. So what's the real key here? Well, I can tell you with certainty and a lot of ex", "[How I Use Google Docs To Run My $5M/Year Business]: No notion, no ASA, no fancy schmancy project management software that's way too complicated. Just Google Docs. The very same thing that maybe you write your grocery list on is the [laughter] very backbone of our $5 million a year business. I'm going ", "[The Boring Way to Make $1M (Using Skills You Already Have)]: Want to know the fastest path to building a profitable business? It's taking the problems you already solve and packaging them into a solution for the people who need it most. People get entrepreneurship all wrong. They think they need to start from ", "[The Smartest Way To Turn Your Expertise Into $1M]: I'm about to say something that might feel like a punch in the gut. Traditional online courses are over. If your plan is to record videos, upload them to a platform, and just magically make money, you're playing a bit of a losing game. And I say that"], "Business Growth": ["[Social Media is Over, Here's What Will Grow Your Business]: I've been on social media a very long time. So long in fact that I started before Instagram even existed. So I'm what you call a social media old lady. But in the last year I completely quit. It's actually been over a year since I've been on any soci", "[The Blueprint To Make Money On YouTube From Day 1 (Updated For 2026)]: Take a guess at how many people are typing into the search bar every single day on this platform on YouTube. It's not 300,000. It's not 3 million. It's three billion. So what does that tell you? What's the significance behind that number? That tells ", "[The Anti-Social Media Strategy That Will Grow Your Business]: Social media is a lot like high school. There's the popular kids, the influencers, and for years, the same people that have been shouting from the rooftops to be posting every single day and post all the content that you can and literally share anyth", "[How to Build a $10K/Month Business Before The Year Ends]: Quick question. Let's picture 12 months from now. I want you to think about three things that you want to be different from your current reality. Because news flash, you have 10 weeks left in the year. 10 weeks. That's it. [music] That's all. So, I'm", "[The Smartest Way To Make $10k/Mo (Without Working More Hours)]: Can I really help you add an extra $10,000 per month to your business using AI without requiring you to work more hours? I know it sounds too good to be true, but I'm about to prove it to you. Using AI, we can create what I call scalable assets, busi"], "Online Business": ["[How I Use Google Docs To Run My $5M/Year Business]: No notion, no ASA, no fancy schmancy project management software that's way too complicated. Just Google Docs. The very same thing that maybe you write your grocery list on is the [laughter] very backbone of our $5 million a year business. I'm going ", "[The Boring Way to Make $1M (Using Skills You Already Have)]: Want to know the fastest path to building a profitable business? It's taking the problems you already solve and packaging them into a solution for the people who need it most. People get entrepreneurship all wrong. They think they need to start from ", "[If I Had To Create an Online Business From Scratch, Here\u2019s What I\u2019d Do]: If I had to build an online coaching program or an online course from scratch, no email list, no following, absolute zero, I know exactly every single step I would take in the next 90 days to achieve that. So, I wanted to make this video to walk you ", "[The Exact Checklist Behind Our Clients $100K Months]: This is a stepbystep checklist to get you from inconsistent revenue months to predictable consistent 100k months with your online business. And you might be thinking, huh, how is that even possible? Well, this is backed by a ton of experience and act", "[How They Make $100k/Mo From One YouTube Video (No Ads)]: What if I told you that a husband and wife team with a cleaning business went from spending thousands on ads every month to generating over $100,000 a month and they did it by posting one video a month. You'd think that was crazy, but that's exactly "], "Entrepreneurship": ["[harsh truths no one tells you about building a $1M business]: Here's something most super successful entrepreneurs are never going to tell you. Growing your business past the $1 million mark can absolutely burn down everything that you've built. I know that that almost happened to my business. And now today, I ", "[How She Built a $600K Online Course in 5 Hours a Day]: This mom of three kids built a $600,000 online business as a lactation consultant. She did this by working just five hours a day, all while her husband is active in the military. And oh, by the way, she also got hacked and lost all of her social medi", "[How I Built A $30M Business (That Runs Itself)]: I've been an entrepreneur for almost two decades, and I've managed to build an online business that's generated well over $30 million in revenue while running almost entirely without me on a day-to-day basis. But if you're looking for me to give you ", "[I Quit Social Media....Now My Business Makes $5M/Yr]: What if I told you that the business owner making half a million dollars a month in your industry isn't posting daily on Instagram. In fact, they're not posting at all. While you're stressing about algorithm changes and engagement drops, they're buil", "[Your Coaching Business is Keeping You Broke (Do This Instead)]: Picture this. It's 4:30 p.m. and I'm staring at my calendar. I haven't had a break all day. It's been backtoback client calls since 8:00 a.m. and I am booked until 7:00. I still need to figure out what I'm going to post on social today. My phone is b"], "Mindset": ["[harsh truths no one tells you about building a $1M business]: Here's something most super successful entrepreneurs are never going to tell you. Growing your business past the $1 million mark can absolutely burn down everything that you've built. I know that that almost happened to my business. And now today, I ", "[My Strategy To Work Less (And Earn More) In 2026]: At this time of year, you're being bombarded with messages about hustling harder and achieving your goals in 2026 and what are you gonna do this year? And I'm going to just do the opposite. I know that you probably heard the term do less to achieve m", "[The Anti-Social Media Strategy That Will Grow Your Business]: Social media is a lot like high school. There's the popular kids, the influencers, and for years, the same people that have been shouting from the rooftops to be posting every single day and post all the content that you can and literally share anyth", "[How to Build a $10K/Month Business Before The Year Ends]: Quick question. Let's picture 12 months from now. I want you to think about three things that you want to be different from your current reality. Because news flash, you have 10 weeks left in the year. 10 weeks. That's it. [music] That's all. So, I'm", "[How I Make $5M/Year Working Only 4hrs a Day]: Today I'm going to walk you through my work week, all 20 hours of it. And I know that sounds kind of insane, but I have simplified my life and my business so much. And my love language is efficiency. So, I have figured out a lot of ways to work less "], "Client Acquisition": ["[The Exact Checklist Behind Our Clients $100K Months]: This is a stepbystep checklist to get you from inconsistent revenue months to predictable consistent 100k months with your online business. And you might be thinking, huh, how is that even possible? Well, this is backed by a ton of experience and act", "[How They Make $100k/Mo From One YouTube Video (No Ads)]: What if I told you that a husband and wife team with a cleaning business went from spending thousands on ads every month to generating over $100,000 a month and they did it by posting one video a month. You'd think that was crazy, but that's exactly ", "[How I Make $500k/Mo On YouTube]: I'm about to take you behind the scenes and show you the real YouTube metrics behind a $5 million a year business. And here's the shocking part. My YouTube channel itself only makes about $5,000 a month in ad revenue, give or take. So, where does the", "[The AI-Powered Business Plan To Earn on YouTube From Day 1]: In the next 20 minutes, I'm going to expose the AI powered business plan that's letting ordinary people earn extraordinary income from day one on YouTube without needing to go viral, without needing millions of subscribers, and definitely without bec", "[The YouTube System That Attracts Clients While You Sleep]: Okay, so I wasn't 100% sure I was going to share this, but I saw a post recently from someone I respect that made it pretty clear that I needed to say something. So, in the post it says, even if you don't have a team, just post whatever you can. Mayb"], "Productivity": ["[How I Use Google Docs To Run My $5M/Year Business]: No notion, no ASA, no fancy schmancy project management software that's way too complicated. Just Google Docs. The very same thing that maybe you write your grocery list on is the [laughter] very backbone of our $5 million a year business. I'm going ", "[My Strategy To Work Less (And Earn More) In 2026]: At this time of year, you're being bombarded with messages about hustling harder and achieving your goals in 2026 and what are you gonna do this year? And I'm going to just do the opposite. I know that you probably heard the term do less to achieve m", "[The Exact Checklist Behind Our Clients $100K Months]: This is a stepbystep checklist to get you from inconsistent revenue months to predictable consistent 100k months with your online business. And you might be thinking, huh, how is that even possible? Well, this is backed by a ton of experience and act", "[How She Built a $600K Online Course in 5 Hours a Day]: This mom of three kids built a $600,000 online business as a lactation consultant. She did this by working just five hours a day, all while her husband is active in the military. And oh, by the way, she also got hacked and lost all of her social medi", "[How I Built A $30M Business (That Runs Itself)]: I've been an entrepreneur for almost two decades, and I've managed to build an online business that's generated well over $30 million in revenue while running almost entirely without me on a day-to-day basis. But if you're looking for me to give you "], "Youtube Strategy": ["[How They Make $100k/Mo From One YouTube Video (No Ads)]: What if I told you that a husband and wife team with a cleaning business went from spending thousands on ads every month to generating over $100,000 a month and they did it by posting one video a month. You'd think that was crazy, but that's exactly ", "[How I Make $500k/Mo On YouTube]: I'm about to take you behind the scenes and show you the real YouTube metrics behind a $5 million a year business. And here's the shocking part. My YouTube channel itself only makes about $5,000 a month in ad revenue, give or take. So, where does the", "[The AI-Powered Business Plan To Earn on YouTube From Day 1]: In the next 20 minutes, I'm going to expose the AI powered business plan that's letting ordinary people earn extraordinary income from day one on YouTube without needing to go viral, without needing millions of subscribers, and definitely without bec", "[How I Make $18k Every Month From a Video With 7,000 Views]: This video makes $18,000 a month every month with less than 7,000 views total. How? I'll give you a little hint. I didn't use any fancy editing tricks or hacks that you might hear about from big YouTubers. In this video, I'm pulling back the curtain ", "[The Smartest Way to Make Money on YouTube from Day One]: YouTube is the new television. That's what the CEO of YouTube wrote in his latest letter celebrating the platform's 20th birthday. 1 billion hours of YouTuber watch daily on the big screen. Not someday, not eventually. Right now, maybe even right thi"], "Scalability": ["[How She Built a $600K Online Course in 5 Hours a Day]: This mom of three kids built a $600,000 online business as a lactation consultant. She did this by working just five hours a day, all while her husband is active in the military. And oh, by the way, she also got hacked and lost all of her social medi", "[How I Built A $30M Business (That Runs Itself)]: I've been an entrepreneur for almost two decades, and I've managed to build an online business that's generated well over $30 million in revenue while running almost entirely without me on a day-to-day basis. But if you're looking for me to give you ", "[I Quit Social Media....Now My Business Makes $5M/Yr]: What if I told you that the business owner making half a million dollars a month in your industry isn't posting daily on Instagram. In fact, they're not posting at all. While you're stressing about algorithm changes and engagement drops, they're buil", "[How I\u2019d Make $100k a Year (Working Only 5 Hours a Week)]: Today, my online business has generated close to $40 million. But when I first was getting started, I was barely scraping by. But my calendar looked like this. I was running a full-time agency. I was consulting one-on-one. I was doing everything unde", "[Your Coaching Business is Keeping You Broke (Do This Instead)]: Picture this. It's 4:30 p.m. and I'm staring at my calendar. I haven't had a break all day. It's been backtoback client calls since 8:00 a.m. and I am booked until 7:00. I still need to figure out what I'm going to post on social today. My phone is b"], "Online Courses": ["[The Ultimate Guide To Make $100k With Online Courses (In 2026)]: We built a $5 million a year business helping people learn over 600 different niches create highly successful and impactful online coaching and online course businesses. So what's the real key here? Well, I can tell you with certainty and a lot of ex", "[The Smartest Way To Turn Your Expertise Into $1M]: I'm about to say something that might feel like a punch in the gut. Traditional online courses are over. If your plan is to record videos, upload them to a platform, and just magically make money, you're playing a bit of a losing game. And I say that", "[How a Simple Google Doc Made $67k In 30 Days]: $67,000 in 30 days using just Google Docs and Zoom. No fancy platforms, no complicated text setup, just the tools that you already use every day. This is a real result from our client, Gary. So, Gary's a successful realtor who struggled for years to ", "[They Made $211M through YouTube (Without Going Viral)]: What if I told you that teachers, fitness instructors, nurses, real estate agents, and restaurant owners, just everyday people, are quietly building million-dollar businesses just by packaging what they already know. It sounds ridiculous, right? It s", "[How To Build & Sell An Online Course With No Experience]: recently a professor walked into her University and handed in her resignation letter not because she was burnt out but because her online course had generated more than her entire year salary in a single month in this video I'm going to show you exac"], "Course Launches": ["[I Make $5M/Yr With Online Courses (Why 94% Fail)]: I've been in the online space for over a decade and I've watched thousands of course launches happen. Some make people millionaires and others well they crash and burn spectacularly. And after analyzing over a thousand failed course launches and seei", "[Watch Me Create a $1M Business (With No Social Media)]: One course, just one course, generated $1.3 million in revenue. And here's the funny part, its success has nothing to do with me. I was on maternity leave, offline, and not around to even coach or consult. So, how did it happen? Well, first, a little", "[How to Create a $5,000+ Online Course THAT SELLS]: Okay, so you're going to watch me create a high ticket offer worth thousands of dollars in the next 10 minutes, right here, right now, using a tool most people don't even know exists. But here's the thing. Most people are sitting on gold mines of kno", "[He Turned $997 into a $1M Business With No Experience]: Recently, Kirby posted in our private group that he crossed $1 million in revenue in his online coaching program. But here's what makes this absolutely incredible. He started with zero online experience. He has never run a single paid ad. And he's do", "[How to Make $89k from a Course Before It Launches]: how is it possible to make nearly $100,000 in income without actually creating a product sounds like a riddle right but it's not I'm going to break down exactly how this happened and the key strategies you can use to go from idea to proof and profit "], "Audience Building": ["[Small Channel Sales Funnel: How to Make $$$ On YouTube On Day 1]: two things that make no difference to how much money your YouTube channel actually makes. The size of your subscriber count or how often you post. But what actually makes a big difference is building a simple mechanism that runs completely on autopil", "[The Smartest Way to Make Money on YouTube from Day One]: YouTube is the new television. That's what the CEO of YouTube wrote in his latest letter celebrating the platform's 20th birthday. 1 billion hours of YouTuber watch daily on the big screen. Not someday, not eventually. Right now, maybe even right thi", "[Monetizing YouTube the Smart Way (Without a Big Audience)]: 99% of YouTubers are broke. Let's be honest. Everyone believes that to be successful on this platform, you need a zillion subscribers, fancy cameras, and Hollywood level editing capabilities. But I'm here to tell you that is simply not true. My clien", "[The AI Strategy that Made $210k in 55 days with No Audience]: Wait, how much? That was actually my reaction when Anna showed us her Stripe account. $210,000 in 55 days with no existing audience. I actually had to refresh the page because I couldn't believe what I was seeing. Anna's success is even more dramatic", "[How to Make $89k from a Course Before It Launches]: how is it possible to make nearly $100,000 in income without actually creating a product sounds like a riddle right but it's not I'm going to break down exactly how this happened and the key strategies you can use to go from idea to proof and profit "], "Youtube Monetization": ["[10 Years of Making Millions on YouTube in 20 Minutes]: It's been 10 years, a decade on YouTube that's completely transformed my life and business. And what started as simple tutorials for my clients has evolved into a multi-million dollar business without chasing views, without really playing the algorit", "[Watch me Create a $1M YouTube Channel in 38 Minutes (Using AI)]: can I really build a million-dollar YouTube channel in the time it takes to record this video well after over a decade of refining a very specific strategy not only have I built multi-million dollar YouTube channels including my own but I've unlocked", "[The No-Subscriber Method to Earning Big $$$ on YouTube]: everyone has that one thing that thing that your friends always ask you about that thing that you could talk about for hours that skill you've mastered that seems so obvious to you that you don't even really think it's special that is your ticket to ", "[Under 100 Subs? Here\u2019s How To Make $250k With A Micro Channel]: crazy question but what if everything you think you know about YouTube success is actually holding you back I just spent the morning looking at a Channel with half a million subscribers impressive right except they can't even cover their production c"], "Product Development": ["[The Ultimate Guide To Make $100k With Online Courses (In 2026)]: We built a $5 million a year business helping people learn over 600 different niches create highly successful and impactful online coaching and online course businesses. So what's the real key here? Well, I can tell you with certainty and a lot of ex", "[Why I Burned Down & Relaunched My Business with AI]: I spent close to a decade developing methodology that has generated millions and millions of dollars and impacted thousands of people and it really worked like super super well. So naturally I thought to myself last year, why don't I just burn it all", "[If I Had To Create an Online Business From Scratch, Here\u2019s What I\u2019d Do]: If I had to build an online coaching program or an online course from scratch, no email list, no following, absolute zero, I know exactly every single step I would take in the next 90 days to achieve that. So, I wanted to make this video to walk you "], "Personal Branding": ["[The Boring Way to Make $1M (Using Skills You Already Have)]: Want to know the fastest path to building a profitable business? It's taking the problems you already solve and packaging them into a solution for the people who need it most. People get entrepreneurship all wrong. They think they need to start from ", "[How To Get Ahead Of 99% Of People In The AI Revolution]: Okay, let's talk about the elephant in the room. You're a little worried about AI and that it might replace you, that everything you've spent years perfecting, your knowledge, your expertise, your skill might become obsolete overnight. It's a really ", "[10 Years of Making Millions on YouTube in 20 Minutes]: It's been 10 years, a decade on YouTube that's completely transformed my life and business. And what started as simple tutorials for my clients has evolved into a multi-million dollar business without chasing views, without really playing the algorit"], "Ai": ["[The Smartest Way To Turn Your Expertise Into $1M]: I'm about to say something that might feel like a punch in the gut. Traditional online courses are over. If your plan is to record videos, upload them to a platform, and just magically make money, you're playing a bit of a losing game. And I say that", "[Why I Burned Down & Relaunched My Business with AI]: I spent close to a decade developing methodology that has generated millions and millions of dollars and impacted thousands of people and it really worked like super super well. So naturally I thought to myself last year, why don't I just burn it all", "[The Smartest Way To Make $10k/Mo (Without Working More Hours)]: Can I really help you add an extra $10,000 per month to your business using AI without requiring you to work more hours? I know it sounds too good to be true, but I'm about to prove it to you. Using AI, we can create what I call scalable assets, busi"], "Business Building": ["[How I Make $18k Every Month From a Video With 7,000 Views]: This video makes $18,000 a month every month with less than 7,000 views total. How? I'll give you a little hint. I didn't use any fancy editing tricks or hacks that you might hear about from big YouTubers. In this video, I'm pulling back the curtain ", "[How I Make $500K/Month Without Social Media]: A year ago, I completely quit social media. No Instagram, Tik Tok, X, nothing. Everyone said it was going to kill my business. Well, I haven't posted in over a year. And guess what happened? My revenue didn't just survive. It actually grew. This isn'", "[They Made $211M through YouTube (Without Going Viral)]: What if I told you that teachers, fitness instructors, nurses, real estate agents, and restaurant owners, just everyday people, are quietly building million-dollar businesses just by packaging what they already know. It sounds ridiculous, right? It s"], "Expertise": ["[How To Get Ahead Of 99% Of People In The AI Revolution]: Okay, let's talk about the elephant in the room. You're a little worried about AI and that it might replace you, that everything you've spent years perfecting, your knowledge, your expertise, your skill might become obsolete overnight. It's a really ", "[The No-Subscriber Method to Earning Big $$$ on YouTube]: everyone has that one thing that thing that your friends always ask you about that thing that you could talk about for hours that skill you've mastered that seems so obvious to you that you don't even really think it's special that is your ticket to ", "[How To Build & Sell An Online Course With No Experience]: recently a professor walked into her University and handed in her resignation letter not because she was burnt out but because her online course had generated more than her entire year salary in a single month in this video I'm going to show you exac"], "Youtube Growth": ["[How \"Average\" People Are Making Millions On YouTube]: Most people think that this is how YouTube works, but this belief is keeping smart people broke. Because the truth is, focusing on racking up views is actually costing you money. Let me show you something very weird. [music] So, look at the math. Whe", "[Small Channel Sales Funnel: How to Make $$$ On YouTube On Day 1]: two things that make no difference to how much money your YouTube channel actually makes. The size of your subscriber count or how often you post. But what actually makes a big difference is building a simple mechanism that runs completely on autopil"], "Scalable Assets": ["[The Smartest Way To Make $10k/Mo (Without Working More Hours)]: Can I really help you add an extra $10,000 per month to your business using AI without requiring you to work more hours? I know it sounds too good to be true, but I'm about to prove it to you. Using AI, we can create what I call scalable assets, busi", "[How I Make $5M/Year Working Only 4hrs a Day]: Today I'm going to walk you through my work week, all 20 hours of it. And I know that sounds kind of insane, but I have simplified my life and my business so much. And my love language is efficiency. So, I have figured out a lot of ways to work less "], "Niche Marketing": ["[How They Make $100k/Mo From One YouTube Video (No Ads)]: What if I told you that a husband and wife team with a cleaning business went from spending thousands on ads every month to generating over $100,000 a month and they did it by posting one video a month. You'd think that was crazy, but that's exactly ", "[The No-Subscriber Method to Earning Big $$$ on YouTube]: everyone has that one thing that thing that your friends always ask you about that thing that you could talk about for hours that skill you've mastered that seems so obvious to you that you don't even really think it's special that is your ticket to "], "Lead Generation": ["[How I Make $500k/Mo On YouTube]: I'm about to take you behind the scenes and show you the real YouTube metrics behind a $5 million a year business. And here's the shocking part. My YouTube channel itself only makes about $5,000 a month in ad revenue, give or take. So, where does the", "[How To Get Ahead Of 99% Of People In The AI Revolution]: Okay, let's talk about the elephant in the room. You're a little worried about AI and that it might replace you, that everything you've spent years perfecting, your knowledge, your expertise, your skill might become obsolete overnight. It's a really "], "Coaching Business": ["[Your Coaching Business is Keeping You Broke (Do This Instead)]: Picture this. It's 4:30 p.m. and I'm staring at my calendar. I haven't had a break all day. It's been backtoback client calls since 8:00 a.m. and I am booked until 7:00. I still need to figure out what I'm going to post on social today. My phone is b"], "Social Media Strategy": ["[I Quit Social Media....Now My Business Makes $5M/Yr]: What if I told you that the business owner making half a million dollars a month in your industry isn't posting daily on Instagram. In fact, they're not posting at all. While you're stressing about algorithm changes and engagement drops, they're buil", "[The YouTube System That Attracts Clients While You Sleep]: Okay, so I wasn't 100% sure I was going to share this, but I saw a post recently from someone I respect that made it pretty clear that I needed to say something. So, in the post it says, even if you don't have a team, just post whatever you can. Mayb"], "Knowledge Monetization": ["[How I Make $500K/Month Without Social Media]: A year ago, I completely quit social media. No Instagram, Tik Tok, X, nothing. Everyone said it was going to kill my business. Well, I haven't posted in over a year. And guess what happened? My revenue didn't just survive. It actually grew. This isn'", "[The Online Business That\u2019s Quietly Making People Millions]: Ever heard the saying, \"It takes money to make money?\" Well, I'm here to tell you that that's simply not the case. In fact, I've helped thousands of people build six and seven figure businesses starting from zero. Over the last decade, their success "], "Client Clarity": ["[The AI Strategy that Made $210k in 55 days with No Audience]: Wait, how much? That was actually my reaction when Anna showed us her Stripe account. $210,000 in 55 days with no existing audience. I actually had to refresh the page because I couldn't believe what I was seeing. Anna's success is even more dramatic", "[The Online Business That\u2019s Quietly Making People Millions]: Ever heard the saying, \"It takes money to make money?\" Well, I'm here to tell you that that's simply not the case. In fact, I've helped thousands of people build six and seven figure businesses starting from zero. Over the last decade, their success "], "Personal Development": ["[How This $15 Book Made Me a Millionaire]: This book right here, I've read it three times, and every time I recommend it to someone, they come back and say, \"Why didn't anyone tell me about this sooner?\" So, it's about two men, a janitor named Ronald Reed and a high-powered CEO. One of them d", "[Give Me 15 Minutes I\u2019ll Turn Your Self-Doubt Into Unshakeable Confidence]: in those moments when we don't think we're smart enough or pretty enough or skinny enough or successful enough or basically just not enough I had a woman say to me just know you will never be enough but you can know the value of your worth if you jus"], "Audience Engagement": ["[How \"Average\" People Are Making Millions On YouTube]: Most people think that this is how YouTube works, but this belief is keeping smart people broke. Because the truth is, focusing on racking up views is actually costing you money. Let me show you something very weird. [music] So, look at the math. Whe"]};
+const ALL_TOPICS = ["Monetization", "Content Strategy", "Business Strategy", "Business Growth", "Online Business", "Entrepreneurship", "Mindset", "Client Acquisition", "Productivity", "Youtube Strategy", "Scalability", "Online Courses", "Course Launches", "Audience Building", "Youtube Monetization", "Product Development", "Personal Branding", "Ai", "Business Building", "Expertise", "Youtube Growth", "Scalable Assets", "Niche Marketing", "Lead Generation", "Coaching Business", "Social Media Strategy", "Knowledge Monetization", "Client Clarity", "Personal Development", "Audience Engagement"];
+const CHANNEL = "SunnyLenarduzzi";
+const CHANNEL_AVG = 51563;
+const API_KEY = "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";
+const VOICE_SUMMARY = "vocabulary_level: Accessible, but with a strategic use of business and marketing jargon (e.g., 'evergreen lead machine,' 'content scaling funnel,' 'northstar vision,' 'transformation,' 'authority blueprint'). She avoids overly academic language, opting for clear, actionable terms. The reading level is generally high school to early college, making it understandable for a broad entrepreneurial audience.\\nsignature_phrases: ['\"This is what I truly believe...\"', '\"News flash...\"', '\"Here\\'s the reality...\"', '\"It\\'s not about X, it\\'s about Y...\"', '\"You\\'ve got to adapt.\"', '\"[Specific number] in [timeframe]...\"', '\"[Something] is your love language.\"']\\nspeaking_patterns: Opens topics with a direct statement or a provocative question that challenges common assumptions. Transitions are often signaled by phrases like 'So, that brings me to...' or 'Now, here's the key...'. She emphasizes key points through repetition, pauses, and a slight shift in vocal tone or pace. She often uses analogies to simplify complex ideas. She frequently refers to specific client examples and their quantifiable results.\\naudience_relationship: Addresses the audience directly and personally, often using 'you' and 'your.' She positions herself as a knowledgeable guide and mentor, sharing her own experiences and lessons learned. She aims to build rapport by acknowledging common struggles and offering solutions. The tone is inclusive, as if speaking to a group of peers or aspiring entrepreneurs she's invested in.\\nunique_quirks: A tendency to use 'weird' or 'very weird' to describe counter-intuitive but effective strategies, creating intrigue. She often uses numerical data and specific timelines to illustrate points and create a sense of urgency or possibility. She has a knack for framing complex business concepts in simple, actionable steps. The use of 'love language' to describe audience engagement is a distinctive touch.";
+
+const TREND_EMOJI = { rising:'🚀', declining:'📉', dormant:'💤', steady:'⚖️' };
+let currentTopic = null;
+
+function getTrend(tl) {
+  const r=tl.recent||0,m=tl.middle||0,o=tl.older||0;
+  if(r>o&&r>m)return'rising';if(o>r&&o>m)return'declining';
+  if(o>0&&r===0)return'dormant';return'steady';
+}
+function getColor(av,idx) {
+  if(CHANNEL_AVG===0)return`hsl(245,${55+(idx%5)*6}%,${Math.max(18,52-idx*1.1)}%)`;
+  const r=av/CHANNEL_AVG;
+  if(r>1.5)return'#e84355';if(r>1.2)return'#c74b8a';if(r>.9)return'#6c63ff';if(r>.6)return'#4a4580';return'#2d2a50';
+}
+function fmtV(v){if(v>=1e6)return(v/1e6).toFixed(1)+'M';if(v>=1e3)return(v/1e3).toFixed(0)+'k';return v.toString()}
+
+// ─── SQUARIFIED TREEMAP ──────────────────────────────────────────
+function squarify(data,x,y,w,h){if(!data.length)return[];if(data.length===1)return[{...data[0],rx:x,ry:y,rw:w,rh:h}];const t=data.reduce((s,d)=>s+d.area,0);if(t<=0)return[];return lay(data,x,y,w,h)}
+function lay(items,x,y,w,h){
+  if(!items.length)return[];if(items.length===1)return[{...items[0],rx:x,ry:y,rw:w,rh:h}];
+  const vert=w>=h,side=vert?h:w;
+  let row=[items[0]],rowA=items[0].area;
+  for(let i=1;i<items.length;i++){const test=[...row,items[i]],testA=rowA+items[i].area;if(wst(row,rowA,side)>=wst(test,testA,side)){row.push(items[i]);rowA+=items[i].area}else break}
+  const rects=[],depth=rowA/side;let pos=0;
+  for(const it of row){const sz=it.area/depth;if(vert)rects.push({...it,rx:x,ry:y+pos,rw:depth,rh:sz});else rects.push({...it,rx:x+pos,ry:y,rw:sz,rh:depth});pos+=sz}
+  const rest=items.slice(row.length);
+  if(rest.length){if(vert)rects.push(...lay(rest,x+depth,y,w-depth,h));else rects.push(...lay(rest,x,y+depth,w,h-depth))}
+  return rects;
+}
+function wst(row,totalA,side){const s2=side*side;let w=0;for(const it of row){w=Math.max(w,Math.max((s2*it.area)/(totalA*totalA),(totalA*totalA)/(s2*it.area)))}return w}
+
+function renderTreemap(){
+  const el=document.getElementById('treemapView'),W=el.clientWidth,H=el.clientHeight;el.innerHTML='';
+  const tv=TOPICS.reduce((s,t)=>s+t.count,0),area=W*H;
+  const items=TOPICS.map((t,i)=>({...t,idx:i,area:(t.count/tv)*area})).sort((a,b)=>b.area-a.area);
+  const rects=squarify(items,0,0,W,H);
+  rects.forEach(r=>{
+    const div=document.createElement('div');div.className='treemap-item';
+    div.style.cssText=`left:${r.rx}px;top:${r.ry}px;width:${r.rw}px;height:${r.rh}px;background:${getColor(r.avg_views,r.idx)}`;
+    let h='';
+    if(r.rw>50&&r.rh>26)h+=`<div class="t-name" style="font-size:${Math.min(18,Math.max(9,Math.sqrt(r.rw*r.rh)/6.5))}px">${r.name}</div>`;
+    if(r.rw>65&&r.rh>42)h+=`<div class="t-sub">${r.count} vids ${TREND_EMOJI[getTrend(r.timeline||{})]||''}</div>`;
+    if(r.rw>90&&r.rh>58&&r.videos.length&&r.videos[0].approx_date)h+=`<div class="t-sub">Latest: ${r.videos[0].approx_date}</div>`;
+    div.innerHTML=h;div.title=r.name;div.onclick=()=>openTopic(r);el.appendChild(div);
+  });
+}
+
+// ─── TOPIC DEEP DIVE ─────────────────────────────────────────────
+function openTopic(topic){
+  currentTopic=topic;
+  document.getElementById('treemapView').classList.add('hidden');
+  const tv=document.getElementById('topicView');tv.classList.remove('hidden');tv.scrollTop=0;
+  const trend=getTrend(topic.timeline||{});
+  const tl=topic.timeline||{},r=tl.recent||0,m=tl.middle||0,o=tl.older||0;
+  const vr=CHANNEL_AVG>0?topic.avg_views/CHANNEL_AVG:0;
+  const pc=vr>1.2?'hot':(vr<.8&&vr>0?'cool':'');
+
+  const mb={};topic.videos.forEach(v=>{if(v.approx_date){const ym=v.approx_date.substring(0,7);mb[ym]=(mb[ym]||0)+1}});
+  const mos=Object.keys(mb).sort();let allM=[];
+  if(mos.length>=2){let c=new Date(mos[0]+'-01');const e=new Date(mos[mos.length-1]+'-01');while(c<=e){const k=c.toISOString().substring(0,7);allM.push({month:k,count:mb[k]||0});c.setMonth(c.getMonth()+1)}}
+  else allM=mos.map(x=>({month:x,count:mb[x]}));
+  const mx=Math.max(...allM.map(x=>x.count),1);
+  const ds=topic.videos.filter(v=>v.approx_date).map(v=>v.approx_date).sort();
+  const earliest=ds[0]||'?',latest=ds[ds.length-1]||'?';
+
+  tv.innerHTML=`
+    <div class="topic-hero">
+      <div class="back-btn" onclick="closeTopic()">← Back to all topics</div>
+      <h2>${topic.name}</h2>
+      <div class="trend-label">
+        <span class="badge ${trend}">${TREND_EMOJI[trend]} ${trend}</span>
+        &nbsp; ${ds.length?`First: <b>${earliest}</b> · Latest: <b>${latest}</b>`:''}
+      </div>
+    </div>
+    <div class="metrics-row">
+      <div class="metric-card"><div class="mv">${topic.count}</div><div class="ml">Videos</div></div>
+      <div class="metric-card ${pc}"><div class="mv">${topic.avg_views>0?fmtV(topic.avg_views):'N/A'}</div><div class="ml">Avg Views</div></div>
+      <div class="metric-card ${pc}"><div class="mv">${vr>0?vr.toFixed(1)+'x':'—'}</div><div class="ml">vs Channel</div></div>
+      <div class="metric-card"><div class="mv">${topic.count}/${TOPICS.length}</div><div class="ml">Topic Share</div></div>
+    </div>
+    ${allM.length>1?`
+    <div class="timeline-section">
+      <h3>📅 When "${topic.name}" was discussed</h3>
+      <div class="timeline-chart">
+        ${allM.map(x=>`<div class="tbar"><div class="tbar-fill" style="height:${Math.max(2,(x.count/mx)*100)}%;${x.count===0?'opacity:.2;background:#333;':''}"><div class="tbar-tip">${x.month}: ${x.count} video${x.count!==1?'s':''}</div></div><div class="tbar-label">${x.month.substring(5)}</div></div>`).join('')}
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:#444;margin-top:4px;padding:0 4px"><span>${allM[0]?.month||''}</span><span>${allM[allM.length-1]?.month||''}</span></div>
+    </div>`:''}
+    <div class="content-grid" id="contentGrid">
+      <div class="section-card" id="aiStance"><h3>🎯 Creator's Stance</h3><div class="ai-loading"><div class="spinner"></div><div style="margin-top:8px">Analyzing...</div></div></div>
+      <div class="section-card" id="aiMarket"><h3>📡 Market Pulse</h3><div class="ai-loading"><div class="spinner"></div><div style="margin-top:8px">Scanning...</div></div></div>
+      <div class="section-card" id="aiIdeas" style="grid-column:span 2"><h3>💡 Content Ideas — click any idea to expand</h3><div class="ai-loading"><div class="spinner"></div><div style="margin-top:8px">Generating ideas...</div></div></div>
+      <div class="section-card" id="aiEdge" style="grid-column:span 2"><h3>⚔️ Competitive Edge</h3><div class="ai-loading"><div class="spinner"></div><div style="margin-top:8px">Analyzing...</div></div></div>
+    </div>
+    <div style="padding:0 40px 40px">
+      <div class="section-card">
+        <h3>📹 Videos on "${topic.name}" (${topic.videos.length})</h3>
+        ${topic.videos.map(v=>`<div class="video-item" onclick="window.open('${v.url}','_blank')"><div class="vi-left"><div class="vi-title">${v.title}</div><div class="vi-meta">${v.views>0?`<span class="vi-views">${fmtV(v.views)} views</span> · `:''}${v.published||''}</div></div>${v.approx_date?`<div class="vi-date">${v.approx_date}</div>`:''}</div>`).join('')}
+      </div>
+    </div>`;
+  generateInsights(topic);
+}
+
+function closeTopic(){
+  document.getElementById('topicView').classList.add('hidden');
+  document.getElementById('treemapView').classList.remove('hidden');
+  currentTopic=null;
+}
+
+// ─── AI INSIGHTS ─────────────────────────────────────────────────
+async function generateInsights(topic){
+  const quotes=QUOTES[topic.name]||[];
+  const trend=getTrend(topic.timeline||{});
+  const titles=topic.videos.map(v=>v.title).join('\n');
+  const dates=topic.videos.filter(v=>v.approx_date).map(v=>`${v.approx_date}: ${v.title}`).join('\n');
+
+  const prompt=`You are a content strategist analyzing "${CHANNEL}"'s YouTube channel.
+
+TOPIC: "${topic.name}"
+FREQUENCY: ${topic.count} videos out of ~${TOPICS.reduce((s,t)=>s+t.count,0)} total
+TREND: ${trend}
+AVG VIEWS: ${topic.avg_views>0?topic.avg_views.toLocaleString():'N/A'}
+CHANNEL AVG VIEWS: ${CHANNEL_AVG>0?CHANNEL_AVG.toLocaleString():'N/A'}
+
+TIMELINE: ${dates||'No date data'}
+ALL TOPICS: ${ALL_TOPICS.join(', ')}
+VIDEOS: ${titles}
+SAMPLE CONTENT: ${quotes.join('\n')}
+
+Respond in EXACT JSON, no markdown fences:
+{
+  "stance":"2-3 sentences on creator's unique angle on this topic.",
+  "market":"2-3 sentences on current market demand for this topic. Rising or falling? What's driving interest?",
+  "ideas":[
+    {"title":"Specific video title","why":"One-sentence data-driven rationale","talking_points":["Key point 1 they should cover","Key point 2","Key point 3","Key point 4"]},
+    {"title":"Second title","why":"Rationale","talking_points":["Point 1","Point 2","Point 3","Point 4"]},
+    {"title":"Third title","why":"Rationale","talking_points":["Point 1","Point 2","Point 3","Point 4"]}
+  ],
+  "edge":"2 sentences on competitive advantage and what others are missing."
+}`;
+
+  try{
+    const resp=await fetch('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:{'Authorization':`Bearer ${API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({model:'google/gemini-2.5-flash-lite:online',messages:[{role:'user',content:prompt}],max_tokens:1200,temperature:.4})});
+    if(!resp.ok)throw new Error('API '+resp.status);
+    const data=await resp.json();
+    let text=data.choices?.[0]?.message?.content||'';
+    text=text.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+    let p;try{p=JSON.parse(text)}catch(e){document.getElementById('aiStance').innerHTML=`<h3>🎯 Analysis</h3><div class="sc-body">${text}</div>`;return}
+
+    document.getElementById('aiStance').innerHTML=`<h3>🎯 Creator's Stance</h3><div class="sc-body">${p.stance||''}</div>`;
+    document.getElementById('aiMarket').innerHTML=`<h3>📡 Market Pulse</h3><div class="sc-body">${p.market||''}</div>`;
+    document.getElementById('aiEdge').innerHTML=`<h3>⚔️ Competitive Edge</h3><div class="sc-body">${p.edge||''}</div>`;
+
+    // Render clickable idea cards
+    let ih='<h3>💡 Content Ideas — click to expand</h3>';
+    if(p.ideas&&p.ideas.length){
+      p.ideas.forEach((idea,i)=>{
+        const id='idea_'+i;
+        let tpHtml='';
+        if(idea.talking_points&&idea.talking_points.length){
+          tpHtml=`<div class="ic-points">`;
+          idea.talking_points.forEach(tp=>{tpHtml+=`<div class="ic-point">• ${tp}</div>`});
+          tpHtml+=`</div>`;
+        }
+        ih+=`
+        <div class="idea-card" id="${id}">
+          <div class="idea-top" onclick="toggleIdea('${id}')">
+            <div class="ic-title">${idea.title} <span class="ic-arrow">▶</span></div>
+            <div class="ic-why">${idea.why}</div>
+            ${tpHtml}
+          </div>
+          <div class="idea-actions">
+            <div class="idea-btn" onclick="event.stopPropagation();generateIdeaContent('${id}','summary','${escHtml(idea.title)}')">
+              <span class="btn-icon">📋</span>
+              Strategic Brief
+              <div class="btn-label">Why now, past proof, gap analysis</div>
+            </div>
+            <div class="idea-btn" onclick="event.stopPropagation();generateIdeaContent('${id}','social','${escHtml(idea.title)}')">
+              <span class="btn-icon">📱</span>
+              Platform Strategy
+              <div class="btn-label">Where to distribute, priority & angles</div>
+            </div>
+            <div class="idea-btn" onclick="event.stopPropagation();generateIdeaContent('${id}','writeit','${escHtml(idea.title)}')">
+              <span class="btn-icon">✍️</span>
+              Write It For Me
+              <div class="btn-label">Full script in their voice & style</div>
+            </div>
+          </div>
+          <div class="idea-result"></div>
+        </div>`;
+      });
+    }
+    document.getElementById('aiIdeas').innerHTML=ih;
+  }catch(e){
+    ['aiStance','aiMarket','aiIdeas','aiEdge'].forEach(id=>{const el=document.getElementById(id);if(el){const ld=el.querySelector('.ai-loading');if(ld)ld.innerHTML=`<div style="color:#555">Unavailable: ${e.message}</div>`}});
+  }
+}
+
+function escHtml(s){return s.replace(/'/g,"\\'").replace(/"/g,"&quot;")}
+
+function toggleIdea(id){
+  const el=document.getElementById(id);
+  el.classList.toggle('open');
+}
+
+// ─── GENERATE IDEA CONTENT ───────────────────────────────────────
+async function generateIdeaContent(cardId, type, title){
+  const card=document.getElementById(cardId);
+  const resultDiv=card.querySelector('.idea-result');
+  const btns=card.querySelectorAll('.idea-btn');
+
+  btns.forEach(b=>b.classList.remove('active'));
+  const btnIdx=type==='summary'?0:type==='social'?1:2;
+  btns[btnIdx].classList.add('active');
+  btns[btnIdx].classList.add('loading');
+
+  card.classList.add('has-result');
+  const loadMsg=type==='summary'?'Building strategic brief...':type==='social'?'Analyzing platform strategy...':'Writing full content in their voice...';
+  resultDiv.innerHTML=`<div class="ai-loading"><div class="spinner"></div><div style="margin-top:8px">${loadMsg}</div></div>`;
+
+  const topicName=currentTopic?.name||'';
+  const quotes=QUOTES[topicName]||[];
+  const topicVideos=currentTopic?.videos||[];
+  const topicTitles=topicVideos.map(v=>v.title+(v.views>0?' ('+fmtV(v.views)+' views)':'')).join('\n');
+  const topicDates=topicVideos.filter(v=>v.approx_date).map(v=>v.approx_date);
+  const lastCovered=topicDates.length?topicDates[0]:'unknown';
+  const trend=getTrend(currentTopic?.timeline||{});
+  const viewRatio=CHANNEL_AVG>0&&currentTopic?.avg_views>0?(currentTopic.avg_views/CHANNEL_AVG).toFixed(1)+'x':'N/A';
+
+  let prompt;
+  if(type==='summary'){
+    prompt=`You are a data-driven content strategy advisor for YouTube creator "${CHANNEL}". You are NOT writing content. You are giving strategic intelligence to help them decide what to create next.
+
+VIDEO IDEA: "${title}"
+TOPIC: "${topicName}"
+
+DATA:
+- Videos on this topic: ${currentTopic?.count||'?'} / ~${TOPICS.reduce((s,t)=>s+t.count,0)} total
+- Trend: ${trend}
+- Topic avg views: ${currentTopic?.avg_views>0?currentTopic.avg_views.toLocaleString():'N/A'}
+- Channel avg views: ${CHANNEL_AVG>0?CHANNEL_AVG.toLocaleString():'N/A'}
+- Performance vs channel: ${viewRatio}
+- Last covered: ${lastCovered}
+
+PAST VIDEOS ON THIS TOPIC:
+${topicTitles}
+
+SAMPLE CONTENT:
+${quotes.join('\n')}
+
+ALL CHANNEL TOPICS: ${ALL_TOPICS.join(', ')}
+
+Respond in EXACT JSON, no markdown:
+{
+  "why_now": "2-3 sentences: Why make this NOW? Market timing, seasonal opportunity, or audience demand signal?",
+  "past_proof": "2-3 sentences: Which of their OWN past videos on this topic performed best and why? What pattern in their data supports this idea? Reference specific titles.",
+  "gap": "2 sentences: What angle on this topic have they NOT covered that their audience would want? What is the hole in their content library?",
+  "differentiation": "2 sentences: What do competitors say about this and how should this creator approach it differently?",
+  "risk": "1-2 sentences: Any reason NOT to make this? Oversaturated? Audience fatigue? Cannibalize existing content?",
+  "format": "1 sentence: Based on what worked before, what format fits? (long tutorial, case study, story-driven, etc.)"
+}`;
+  }else if(type==='writeit'){
+    const voiceCtx=VOICE_SUMMARY?`\nCREATOR VOICE PROFILE:\n${VOICE_SUMMARY}`:'';
+    prompt=`You are writing AS ${CHANNEL}, the YouTube creator. Write in FIRST PERSON using their exact voice and style.${voiceCtx}
+
+Write a complete YouTube video script for:
+Title: "${title}"
+Topic: "${topicName}"
+
+Their existing content for voice reference:
+${quotes.join('\n')}
+
+Write the COMPLETE ready-to-film script with:
+1. INTRO HOOK (first 15 seconds to grab attention)
+2. MAIN CONTENT (organized sections with key talking points)
+3. OUTRO + CTA (how they close and what they ask viewers to do)
+
+Match their tone, energy, phrases, and style exactly. Write as if they are speaking directly to camera.`;
+  }else if(type==='social'){
+    prompt=`You are a platform distribution strategist advising YouTube creator "${CHANNEL}". You are NOT writing posts. You are advising which platforms to prioritize and what strategy to use, backed by data.
+
+VIDEO IDEA: "${title}"
+TOPIC: "${topicName}"
+
+DATA:
+- Videos: ${currentTopic?.count||'?'} / ~${TOPICS.reduce((s,t)=>s+t.count,0)} total
+- Avg views: ${currentTopic?.avg_views>0?currentTopic.avg_views.toLocaleString():'N/A'}
+- vs Channel: ${viewRatio}
+- Trend: ${trend}
+- Last covered: ${lastCovered}
+
+PAST CONTENT:
+${quotes.join('\n')}
+
+For each platform, give STRATEGIC GUIDANCE not copy. Respond in EXACT JSON, no markdown:
+{
+  "youtube": {"priority":"high/medium/low","strategy":"1-2 sentences: approach for this topic on YT","title_directions":[{"title":"A specific suggested video title","talking_points":["Key point they should cover in this video","Second key point to address","Third key point or angle to explore","Closing point or call-to-action idea"]},{"title":"Second title option","talking_points":["Point 1","Point 2","Point 3","Point 4"]},{"title":"Third title option","talking_points":["Point 1","Point 2","Point 3","Point 4"]}],"tip":"1 SEO or thumbnail tip"},
+  "instagram": {"priority":"high/medium/low","strategy":"1-2 sentences: Reel vs carousel vs static and why","hook":"The emotional angle for IG","talking_points":["What to show/say in the first 3 seconds","Key message to convey","CTA approach"]},
+  "twitter": {"priority":"high/medium/low","strategy":"1-2 sentences: Thread vs single vs quote-tweet","hook":"The debate or hot take angle","talking_points":["Opening hook concept","Value point to make","Engagement driver"]},
+  "linkedin": {"priority":"high/medium/low","strategy":"1-2 sentences: Right for LinkedIn? What framing?","hook":"Professional angle","talking_points":["Professional framing concept","Key insight to share","CTA approach"]},
+  "tiktok": {"priority":"high/medium/low","strategy":"1-2 sentences: Format that fits","hook":"3-second hook concept","talking_points":["Hook moment","Key reveal or point","Trending format to use"]},
+  "email": {"priority":"high/medium/low","strategy":"1-2 sentences: Standalone or series? What converts?","hook":"Subject line direction","talking_points":["Opening line concept","Value proposition","CTA approach"]}
+}`;
+  }
+
+  try{
+    const resp=await fetch('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:{'Authorization':`Bearer ${API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({model:'google/gemini-2.5-flash-lite:online',messages:[{role:'user',content:prompt}],max_tokens:2000,temperature:.5})});
+    if(!resp.ok)throw new Error('API '+resp.status);
+    const data=await resp.json();
+    let text=data.choices?.[0]?.message?.content||'';
+
+    btns.forEach(b=>b.classList.remove('loading'));
+
+    if(type==='writeit'){
+      text=text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+      resultDiv.innerHTML=`<div class="result-content" style="max-height:800px">${text}</div>`;
+    }else if(type==='summary'){
+      text=text.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+      let sb;
+      try{sb=JSON.parse(text)}catch(e){resultDiv.innerHTML=`<div class="result-content">${text.replace(/\n/g,'<br>')}</div>`;return}
+      resultDiv.innerHTML=`<div class="result-content">
+        <h4>Why Now</h4><p>${sb.why_now||''}</p>
+        <h4>Past Proof (from your data)</h4><p>${sb.past_proof||''}</p>
+        <h4>Gap Analysis</h4><p>${sb.gap||''}</p>
+        <h4>Differentiation</h4><p>${sb.differentiation||''}</p>
+        <h4>Risk Check</h4><p>${sb.risk||''}</p>
+        <h4>Recommended Format</h4><p>${sb.format||''}</p>
+      </div>`;
+    }else{
+      // Parse social media JSON
+      text=text.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+      let sm;
+      try{sm=JSON.parse(text)}catch(e){
+        resultDiv.innerHTML=`<div class="result-content">${text.replace(/\n/g,'<br>')}</div>`;
+        return;
+      }
+
+      // Build platform strategy boxes
+      const pconf = [
+        {key:'youtube',icon:'🎬',name:'YouTube',color:'#ff4444'},
+        {key:'instagram',icon:'📸',name:'Instagram',color:'#e1306c'},
+        {key:'twitter',icon:'𝕏',name:'Twitter / X',color:'#1da1f2'},
+        {key:'linkedin',icon:'💼',name:'LinkedIn',color:'#0077b5'},
+        {key:'tiktok',icon:'🎵',name:'TikTok',color:'#00f2ea'},
+        {key:'email',icon:'📧',name:'Email',color:'#6c63ff'},
+      ];
+      const platforms = [];
+      pconf.forEach(pc=>{const d=sm[pc.key];if(!d)return;
+        const pri=d.priority||'medium';
+        const priColor=pri==='high'?'#6bcb77':pri==='low'?'#ff6b6b':'#ffd93d';
+        let body=`<div style="margin-bottom:8px"><span style="display:inline-block;padding:2px 10px;border-radius:10px;font-size:10px;font-weight:700;background:${priColor}22;color:${priColor}">${pri.toUpperCase()} PRIORITY</span></div>`;
+        body+=`<p style="margin:8px 0;font-size:13px;line-height:1.6;color:#ccc">${d.strategy||''}</p>`;
+        if(d.title_directions&&Array.isArray(d.title_directions)){
+          body+=`<h4 style="color:#6c63ff;font-size:10px;text-transform:uppercase;margin:10px 0 4px">Title Directions</h4>`;
+          d.title_directions.forEach((td,ti)=>{
+            if(typeof td==='object'&&td.title){
+              body+=`<div class="post-block"><strong>${td.title}</strong>`;
+              if(td.talking_points&&td.talking_points.length){
+                body+=`<div style="margin-top:6px">`;
+                td.talking_points.forEach(tp=>{body+=`<div style="color:#999;font-size:11px;padding:1px 0 1px 10px">&bull; ${tp}</div>`});
+                body+=`</div>`;
+              }
+              const writeId=`write_${cardId}_${pc.key}_${ti}`;
+              body+=`<div style="margin-top:8px"><span id="${writeId}" onclick="event.stopPropagation();writeContentForMe('${writeId}','${escHtml(td.title)}','${pc.key}')" style="display:inline-block;padding:4px 12px;border-radius:6px;background:#6c63ff22;color:#a29bfe;font-size:10px;font-weight:600;cursor:pointer;border:1px solid #6c63ff44;transition:all .15s"onmouseover="this.style.background='#6c63ff44'"onmouseout="this.style.background='#6c63ff22'">✍️ Write this for me</span></div>`;
+              body+=`</div>`;
+            }else{
+              body+=`<div class="post-block">${td}</div>`;
+            }
+          });
+        }
+        if(d.tip)body+=`<div class="post-block" style="border-left-color:#ffd93d"><strong>Tip:</strong> ${d.tip}</div>`;
+        if(d.hook)body+=`<div class="post-block"><strong>Angle:</strong> ${d.hook}</div>`;
+        if(d.talking_points&&!d.title_directions){
+          body+=`<div style="margin-top:6px">`;
+          d.talking_points.forEach(tp=>{body+=`<div style="color:#999;font-size:11px;padding:1px 0 1px 10px">&bull; ${tp}</div>`});
+          const writeId2=`write_${cardId}_${pc.key}`;
+          body+=`<div style="margin-top:8px"><span id="${writeId2}" onclick="event.stopPropagation();writeContentForMe('${writeId2}','${escHtml(title)}','${pc.key}')" style="display:inline-block;padding:4px 12px;border-radius:6px;background:#6c63ff22;color:#a29bfe;font-size:10px;font-weight:600;cursor:pointer;border:1px solid #6c63ff44;transition:all .15s"onmouseover="this.style.background='#6c63ff44'"onmouseout="this.style.background='#6c63ff22'">✍️ Write this for me</span></div>`;
+          body+=`</div>`;
+        }
+        platforms.push({...pc,content:body,pri});
+      });
+
+      let html=`<div class="result-content"><div class="platform-grid">`;
+      platforms.forEach((pl,i)=>{
+        html+=`
+        <div class="plat-box" id="plat_${cardId}_${i}" onclick="togglePlat('plat_${cardId}_${i}')" style="--plat-color:${pl.color}">
+          <div class="plat-header">
+            <span class="plat-icon">${pl.icon}</span>
+            <span class="plat-name">${pl.name}</span>
+            <span class="plat-arrow">▶</span>
+          </div>
+          <div class="plat-body">${pl.content}</div>
+        </div>`;
+      });
+      html+=`</div></div>`;
+      resultDiv.innerHTML=html;
+    }
+  }catch(e){
+    btns.forEach(b=>b.classList.remove('loading'));
+    resultDiv.innerHTML=`<div class="result-content" style="color:#666">Failed: ${e.message}</div>`;
+  }
+}
+
+// ─── WRITE CONTENT FOR ME (per title direction) ─────────────
+async function writeContentForMe(btnId, contentTitle, platform){
+  const btn=document.getElementById(btnId);
+  if(!btn)return;
+  const parent=btn.closest('.post-block')||btn.parentElement;
+  btn.innerHTML=`<div class="spinner" style="width:14px;height:14px;display:inline-block;vertical-align:middle"></div> Writing...`;
+  btn.style.pointerEvents='none';
+
+  const topicName=currentTopic?.name||'';
+  const quotes=QUOTES[topicName]||[];
+  const voiceCtx=VOICE_SUMMARY?`\nCREATOR VOICE PROFILE:\n${VOICE_SUMMARY}`:'';
+
+  const platNames={youtube:'YouTube video script',instagram:'Instagram post',twitter:'Twitter/X thread',linkedin:'LinkedIn post',tiktok:'TikTok script',email:'email to their list'};
+
+  const prompt=`You are writing AS ${CHANNEL}, the YouTube creator. Write in FIRST PERSON using their exact voice and style.${voiceCtx}
+
+Write a complete ${platNames[platform]||'post'} for this content idea:
+Title: "${contentTitle}"
+Topic: "${topicName}"
+
+Their existing content for voice reference:
+${quotes.join('\n')}
+
+Write the COMPLETE ready-to-use content. Match their tone, energy, phrases, and style exactly. For YouTube scripts include intro hook, main content sections, and outro/CTA. For social posts make them ready to paste and publish.`;
+
+  try{
+    const resp=await fetch('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:{'Authorization':`Bearer ${API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({model:'google/gemini-2.5-flash-lite:online',messages:[{role:'user',content:prompt}],max_tokens:3000,temperature:.5})});
+    if(!resp.ok)throw new Error('API '+resp.status);
+    const data=await resp.json();
+    let text=data.choices?.[0]?.message?.content||'';
+    text=text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+    const resultDiv=document.createElement('div');
+    resultDiv.style.cssText='margin-top:10px;background:#12141f;border:1px solid #2a2d3a;border-radius:8px;padding:14px;font-size:12px;line-height:1.7;color:#ccc;max-height:400px;overflow-y:auto';
+    resultDiv.innerHTML=text;
+    btn.style.display='none';
+    parent.appendChild(resultDiv);
+  }catch(e){
+    btn.innerHTML='✍️ Write this for me';
+    btn.style.pointerEvents='auto';
+  }
+}
+
+// ─── PLATFORM TOGGLE ─────────────────────────────────────────
+function togglePlat(id){
+  const el=document.getElementById(id);
+  if(el.classList.contains('open')){el.classList.remove('open')}
+  else{
+    // Close siblings
+    el.parentElement.querySelectorAll('.plat-box.open').forEach(b=>b.classList.remove('open'));
+    el.classList.add('open');
+  }
+}
+
+// ─── NAV ─────────────────────────────────────────────────────────
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeTopic()});
+renderTreemap();
+window.addEventListener('resize',()=>{if(!document.getElementById('treemapView').classList.contains('hidden'))renderTreemap()});
+</script>
+</body>
+</html>

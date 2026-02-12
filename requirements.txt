@@ -1,0 +1,16 @@
+# TrueInfluenceAI - Python Dependencies
+# ======================================
+# Core web server
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-dotenv>=1.0.0
+
+# Pipeline
+requests>=2.31.0
+scrapetube>=2.5.0
+
+# Embedding & LLM (via OpenRouter - no local models)
+# Uses OPENROUTER_API_KEY for all AI calls
+
+# YouTube data
+yt-dlp>=2024.1.0

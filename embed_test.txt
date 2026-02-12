@@ -1,0 +1,7 @@
+openai/text-embedding-3-small: 200 
+         
+{"error":{"message":"No successful provider responses.","code":404}}
+openai/text-embedding-3-large: 200 {"error":{"message":"No successful provider responses.","code":404}}
+openai/text-embedding-ada-002: 200 
+         
+{"error":{"message":"No successful provider responses.","code":404}}

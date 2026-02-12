@@ -1,0 +1,27 @@
+Bundle: SunnyLenarduzzi_20260211_164612
+Total videos: 50, third = 16
+Recent: rank 0-15 (fN_2c_LPfX0 to -LaY2yerqHo)
+Middle: rank 16-31
+Older:  rank 32+
+  Recent: 2026-02-10 to 2025-10-07
+  Middle: 2025-09-30 to 2025-06-17
+  Older: 2025-06-10 to 2025-02-11
+
+Fixed timeline:
+  Monetization                   R=10  M=13  O=12
+  Content Strategy               R=6  M=3  O=9
+  Business Growth                R=7  M=5  O=3
+  Business Strategy              R=5  M=4  O=3
+  Online Business                R=5  M=3  O=0
+  Course Launches                R=2  M=4  O=2
+  Client Acquisition             R=1  M=4  O=3
+  Expertise                      R=4  M=0  O=3
+  Youtube Growth                 R=1  M=1  O=4
+  Online Courses                 R=4  M=1  O=1
+  Youtube Strategy               R=0  M=3  O=3
+  Scalability                    R=1  M=5  O=0
+  Audience Building              R=0  M=1  O=4
+  Mindset                        R=3  M=0  O=1
+  Entrepreneurship               R=2  M=1  O=1
+
+[OK] analytics_report.json patched

@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SunnyLenarduzzi — Analytics | TrueInfluenceAI</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f1117;color:#e0e0e0}
+.header{padding:14px 24px;background:#161822;border-bottom:1px solid #2a2d3a;display:flex;align-items:center;gap:16px}
+.header a{color:#6c63ff;text-decoration:none;font-size:13px}
+.header h1{font-size:18px;color:#fff;flex:1}
+.header h1 span{color:#6c63ff}
+.container{max-width:1100px;margin:0 auto;padding:24px}
+.section{background:#161822;border:1px solid #2a2d3a;border-radius:12px;padding:24px;margin-bottom:24px}
+.section h2{font-size:14px;color:#6c63ff;text-transform:uppercase;letter-spacing:1px;margin-bottom:16px}
+.section .section-sub{font-size:12px;color:#555;margin-top:-12px;margin-bottom:16px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:#555;font-size:10px;text-transform:uppercase;letter-spacing:.5px;padding:8px 12px;border-bottom:1px solid #2a2d3a}
+td{padding:10px 12px;border-bottom:1px solid #1a1d2e}
+.trend-badge{display:inline-block;padding:2px 10px;border-radius:10px;font-size:10px;font-weight:700}
+.trend-badge.rising{background:#1a3a2a;color:#6bcb77}
+.trend-badge.declining{background:#3a1a1a;color:#ff6b6b}
+.trend-badge.dormant{background:#3a3a1a;color:#ffd93d}
+.trend-badge.steady{background:#1a2a3a;color:#6ba3cb}
+.bar{height:6px;border-radius:3px;background:#6c63ff;display:inline-block;vertical-align:middle}
+.bar.hot{background:#ff6b6b}
+.bar.cool{background:#4a4580}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px}
+.pairs-grid{display:flex;flex-wrap:wrap;gap:8px}
+.pair-chip{background:#1a1d2e;border:1px solid #2a2d3a;border-radius:8px;padding:8px 14px;font-size:12px}
+.pair-chip b{color:#fff}
+.pair-chip span{color:#555;margin-left:4px}
+.recs{font-size:13px;line-height:1.8;color:#ccc}
+.insight-item{display:flex;gap:12px;padding:12px 16px;background:#1a1d2e;border-radius:10px;margin-bottom:10px;border-left:3px solid #6c63ff}
+.insight-icon{font-size:20px;flex-shrink:0}
+.insight-text{font-size:13px;line-height:1.6;color:#ccc}
+.big-stat-row{display:flex;gap:16px;margin-bottom:16px}
+.big-stat{flex:1;text-align:center;background:#1a1d2e;border-radius:10px;padding:16px}
+.bs-val{font-size:28px;font-weight:700;color:#fff}
+.bs-label{font-size:10px;color:#555;text-transform:uppercase;margin-top:4px;letter-spacing:.5px}
+.video-row{display:flex;align-items:center;gap:10px;padding:8px 12px;background:#1a1d2e;border-radius:8px;margin-bottom:6px;font-size:12px}
+.vr-title{flex:1;color:#ddd}
+.vr-views{color:#6c63ff;font-weight:600;white-space:nowrap}
+.vr-badge{display:inline-block;padding:2px 10px;border-radius:10px;font-size:10px;font-weight:600;background:#6c63ff22;color:#a29bfe;white-space:nowrap}
+.sub-label{font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.5px;margin:12px 0 8px;font-weight:700}
+.sub-note{font-size:11px;color:#444;margin-bottom:10px;font-style:italic}
+.formula-box{background:#1a1d40;border:1px solid #6c63ff44;border-radius:10px;padding:16px 20px;margin-bottom:16px}
+.formula-label{font-size:10px;color:#6c63ff;text-transform:uppercase;letter-spacing:1px;font-weight:700;margin-bottom:6px}
+.formula-text{font-size:16px;color:#fff;font-weight:700;margin-bottom:10px}
+.example-title{font-size:12px;color:#999;padding:4px 0 4px 12px;border-left:2px solid #6c63ff44;margin:4px 0}
+.ai-rec{background:#1a1d2e;border-radius:8px;padding:12px 16px;font-size:13px;color:#ccc;line-height:1.6;margin-top:12px;border-left:3px solid #6c63ff}
+.big-bet{background:linear-gradient(135deg,#1a1d40,#2a1a40);border:1px solid #6c63ff;border-radius:12px;padding:24px;font-size:15px;color:#fff;line-height:1.7;text-align:center}
+.big-bet .bb-label{font-size:10px;color:#6c63ff;text-transform:uppercase;letter-spacing:2px;font-weight:700;margin-bottom:10px}
+@media(max-width:700px){.grid2,.grid3{grid-template-columns:1fr}.big-stat-row{flex-direction:column}}
+</style></head><body>
+
+<div class="header">
+  <a href="index.html">&larr; Home</a>
+  <h1><span>Analytics</span> — SunnyLenarduzzi</h1>
+</div>
+
+<div class="container">
+
+<div class="section"><div class="big-bet"><div class="bb-label">The One Big Bet</div>Leverage her proven 'negative contrarian' title formula to create a series of videos that directly challenge common YouTube growth and monetization advice, positioning herself as the 'anti-guru.' This series should focus on actionable strategies that build profitable businesses, not just vanity metrics. For instance, a video titled 'The YouTube Algorithm is a Lie: Focus on This Instead' or 'Forget Keyword Hacks: How to Build a $100K Channel with THIS Strategy' could tap into her highest-performing content type and address the core needs of her audience for genuine business growth.</div></div>
+
+<div class="grid2"><div class="section"><h2>Blind Spots</h2><div class="section-sub">Things you probably don't realize about your own content</div><div class="insight-item"><div class="insight-icon">&#x1F441;</div><div class="insight-text">Sunny is likely over-indexing on 'how-to' titles, which, while performing above average (64.9% lift), are significantly outperformed by her 'negative_contrarian' titles (241.7% lift). This suggests she's not fully leveraging her strength in creating provocative, anti-establishment content.</div></div><div class="insight-item"><div class="insight-icon">&#x1F441;</div><div class="insight-text">The data indicates a strong preference for 'contrarian' titles, which generate 133.3% more views than conventional titles. However, her 'negative_contrarian' title formula, which is her highest performing, is only used in 9 videos, suggesting an underutilization of her most impactful title strategy.</div></div><div class="insight-item"><div class="insight-icon">&#x1F441;</div><div class="insight-text">While Sunny's content velocity is consistently around 7 days, the 'best performers by gap' show that her highest-viewed videos are posted with gaps of 6 or 7 days. This implies that while her current rhythm is good, there might be a slight optimization opportunity by ensuring consistency within this narrow, high-performing window, rather than allowing for occasional longer gaps.</div></div></div><div class="section"><h2>Money Left on the Table</h2><div class="section-sub">Specific opportunities hiding in your data</div><div class="insight-item"><div class="insight-icon">&#x1F4B0;</div><div class="insight-text">Monetizing 'dormant' topics like 'Social Media Detox' and 'Long-Form Content' presents a significant opportunity. These topics have historically performed exceptionally well (327,249 views, 9.32x channel average) and could be revived with a contrarian angle, aligning with her high-performing title strategy.</div></div><div class="insight-item"><div class="insight-icon">&#x1F4B0;</div><div class="insight-text">The 'topic cannibalization' data shows a 100% overlap between 'Monetization' and 'Youtube Growth'/'Youtube Strategy,' and 'Audience Building' and 'Monetization.' This suggests an opportunity to create more focused content that clearly delineates between these interconnected topics, perhaps by creating a series that addresses each aspect distinctly to avoid audience confusion and capture a wider range of search intent.</div></div><div class="insight-item"><div class="insight-icon">&#x1F4B0;</div><div class="insight-text">The 'Engagement Anomalies' highlight a strong passion for content related to building high-ticket businesses and sales funnels. While these videos perform well, there's an opportunity to create more content specifically around 'Small Channel Sales Funnels' and 'Online Course Creation That Sells,' as these have shown exceptionally high comment rates, indicating a highly engaged and motivated audience.</div></div></div></div>
+
+<div class="section"><h2>Contrarian vs Conventional — Your Secret Weapon</h2><div class="section-sub">Titles that challenge assumptions massively outperform</div><div class="big-stat-row">
+          <div class="big-stat"><div class="bs-val" style="color:#ff6b6b">60,823</div><div class="bs-label">Contrarian Avg Views</div></div>
+          <div class="big-stat"><div class="bs-val">26,067</div><div class="bs-label">Conventional Avg Views</div></div>
+          <div class="big-stat"><div class="bs-val" style="color:#6bcb77">+133%</div><div class="bs-label">Contrarian Lift</div></div>
+        </div>
+        <div class="sub-label">Top Contrarian Videos</div><div class="video-row"><span class="vr-title">How I Make $500K/Month Without Social Media</span><span class="vr-views">327,249</span></div><div class="video-row"><span class="vr-title">Social Media is Over, Here's What Will Grow Your Business</span><span class="vr-views">231,194</span></div><div class="video-row"><span class="vr-title">The Anti-Social Media Strategy That Will Grow Your Business</span><span class="vr-views">106,992</span></div><div class="video-row"><span class="vr-title">I'm Starting Over Again From Zero...</span><span class="vr-views">29,555</span></div><div class="video-row"><span class="vr-title">I Quit Social Media....Now My Business Makes $5M/Yr</span><span class="vr-views">17,268</span></div></div>
+
+<div class="grid2"><div class="section"><h2>Title Formula That Works</h2><div class="section-sub">Based on view lift analysis across all your titles</div><div class="formula-box"><div class="formula-label">Winning Formula</div><div class="formula-text">Negative Contrarian + Benefit-Driven Outcome</div><div class="example-title">Everything You've Been Taught About YouTube is Dead Wrong (And How to Actually Grow)</div><div class="example-title">Stop Chasing Views: The Anti-Algorithm Strategy That Builds Real Business</div><div class="example-title">Why Your 'Expert' Content Isn't Selling (And The CODE That Will)</div></div><table><tr><th>Pattern</th><th>Videos</th><th>Avg Views</th><th>Lift vs Others</th></tr><tr><td style="color:#fff">Negative Contrarian</td><td>9</td><td>83,587</td><td style="color:#6bcb77;font-weight:700">+241.7%</td></tr><tr><td style="color:#fff">How To</td><td>13</td><td>49,531</td><td style="color:#6bcb77;font-weight:700">+64.9%</td></tr><tr><td style="color:#fff">Timeframe</td><td>7</td><td>32,148</td><td style="color:#ff6b6b;font-weight:700">-9.7%</td></tr><tr><td style="color:#fff">Dollar Amount</td><td>28</td><td>32,788</td><td style="color:#ff6b6b;font-weight:700">-13.8%</td></tr><tr><td style="color:#fff">Question Title</td><td>1</td><td>27,527</td><td style="color:#ff6b6b;font-weight:700">-21.9%</td></tr><tr><td style="color:#fff">Listicle</td><td>1</td><td>19,560</td><td style="color:#ff6b6b;font-weight:700">-44.8%</td></tr><tr><td style="color:#fff">Number In Title</td><td>20</td><td>22,673</td><td style="color:#ff6b6b;font-weight:700">-47.7%</td></tr><tr><td style="color:#fff">Parenthetical</td><td>14</td><td>16,935</td><td style="color:#ff6b6b;font-weight:700">-59.8%</td></tr></table></div>
+
+<div class="section"><h2>Audience Passion Signals</h2><div class="section-sub">Videos where your audience engaged far above normal — they want MORE of this</div><div class="sub-note">Channel avg comment rate: 2.7%</div><div class="video-row"><span class="vr-title">How to Build a $10K/Month Business Before The Year Ends</span><span class="vr-badge" style="background:#6c63ff22;color:#a29bfe">4.84% comments (1.8x avg)</span><span class="vr-views">55,593 views</span></div><div class="video-row"><span class="vr-title">How to Create a $5,000+ Online Course THAT SELLS</span><span class="vr-badge" style="background:#6c63ff22;color:#a29bfe">4.49% comments (1.7x avg)</span><span class="vr-views">14,531 views</span></div><div class="video-row"><span class="vr-title">Small Channel Sales Funnel: How to Make $$$ On YouTube On Day 1</span><span class="vr-badge" style="background:#6c63ff22;color:#a29bfe">4.3% comments (1.6x avg)</span><span class="vr-views">19,209 views</span></div><div class="video-row"><span class="vr-title">How I Make $500K/Month Without Social Media</span><span class="vr-badge" style="background:#6c63ff22;color:#a29bfe">4.3% comments (1.6x avg)</span><span class="vr-views">327,249 views</span></div><div class="video-row"><span class="vr-title">The AI-Powered Business Plan To Earn on YouTube From Day 1</span><span class="vr-badge" style="background:#6c63ff22;color:#a29bfe">4.21% comments (1.6x avg)</span><span class="vr-views">30,415 views</span></div></div></div>
+
+<div class="section"><h2>Posting Rhythm</h2><div class="section-sub">How your posting frequency affects performance</div><div class="big-stat-row">
+          <div class="big-stat"><div class="bs-val">7.0</div><div class="bs-label">Avg Days Between Posts</div></div>
+          <div class="big-stat"><div class="bs-val">35,841</div><div class="bs-label">6-10 days apart (47 vids)</div></div>
+          <div class="big-stat"><div class="bs-val" style="color:#ff6b6b">21,565</div><div class="bs-label">11+ days apart (2 vids)</div></div>
+        </div><div class="ai-rec">Maintain a consistent posting schedule of exactly 7 days apart. The 'best performers by gap' data shows that her top videos are consistently posted every 7 days. While 6-day gaps also perform well, a strict 7-day rhythm offers the most predictable and consistently high performance, minimizing the risk of lower-viewed content due to inconsistent posting.</div></div>
+
+<div class="grid2"><div class="section"><h2>Revival Candidates</h2><div class="section-sub">Topics you stopped covering that your audience loved</div><div class="video-row"><span class="vr-title">Social Media Detox</span><span class="trend-badge dormant">dormant</span><span class="vr-badge">9.32x channel avg</span><span class="vr-views">327,249 avg</span></div><div class="video-row"><span class="vr-title">Long-Form Content</span><span class="trend-badge dormant">dormant</span><span class="vr-badge">9.32x channel avg</span><span class="vr-views">327,249 avg</span></div><div class="video-row"><span class="vr-title">Knowledge Monetization</span><span class="trend-badge dormant">dormant</span><span class="vr-badge">4.96x channel avg</span><span class="vr-views">174,064 avg</span></div><div class="video-row"><span class="vr-title">Business Building</span><span class="trend-badge dormant">dormant</span><span class="vr-badge">1.8x channel avg</span><span class="vr-views">63,095 avg</span></div><div class="video-row"><span class="vr-title">Online Education</span><span class="trend-badge dormant">dormant</span><span class="vr-badge">1.48x channel avg</span><span class="vr-views">51,930 avg</span></div><div class="video-row"><span class="vr-title">Business Model</span><span class="trend-badge dormant">dormant</span><span class="vr-badge">1.27x channel avg</span><span class="vr-views">44,445 avg</span></div></div>
+
+<div class="section"><h2>Topic Cannibalization</h2><div class="section-sub">Topics that overlap so much they may confuse your audience</div><div class="video-row"><span class="vr-title">Monetization + Youtube Growth</span><span class="vr-badge" style="background:#ff6b6b22;color:#ff6b6b">100.0% overlap</span><span class="vr-views">6x paired</span></div><div class="video-row"><span class="vr-title">Monetization + Youtube Strategy</span><span class="vr-badge" style="background:#ff6b6b22;color:#ff6b6b">100.0% overlap</span><span class="vr-views">6x paired</span></div><div class="video-row"><span class="vr-title">Audience Building + Monetization</span><span class="vr-badge" style="background:#ff6b6b22;color:#ff6b6b">100.0% overlap</span><span class="vr-views">5x paired</span></div><div class="video-row"><span class="vr-title">Course Launches + Monetization</span><span class="vr-badge" style="background:#ff6b6b22;color:#ff6b6b">87.5% overlap</span><span class="vr-views">7x paired</span></div><div class="video-row"><span class="vr-title">Client Acquisition + Youtube Strategy</span><span class="vr-badge" style="background:#ff6b6b22;color:#ff6b6b">83.3% overlap</span><span class="vr-views">5x paired</span></div><div class="video-row"><span class="vr-title">Business Growth + Monetization</span><span class="vr-badge" style="background:#ff6b6b22;color:#ff6b6b">80.0% overlap</span><span class="vr-views">12x paired</span></div></div></div>
+
+<div class="section">
+  <h2>Topic Performance Rankings</h2>
+  <table>
+    <tr><th>Topic</th><th>Videos</th><th>Avg Views</th><th>vs Channel</th><th style="width:120px">Performance</th><th>Trend</th><th>Recent</th><th>Mid</th><th>Older</th></tr>
+    <tr>
+      <td style="color:#fff;font-weight:600">Monetization</td>
+      <td>35</td>
+      <td>33,640</td>
+      <td>0.96x</td>
+      <td><div class="bar " style="width:48.0px"></div></td>
+      <td><span class="trend-badge steady">steady</span></td>
+      <td>10</td><td>13</td><td>12</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Content Strategy</td>
+      <td>18</td>
+      <td>31,748</td>
+      <td>0.9x</td>
+      <td><div class="bar " style="width:45.0px"></div></td>
+      <td><span class="trend-badge declining">declining</span></td>
+      <td>6</td><td>3</td><td>9</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Business Growth</td>
+      <td>15</td>
+      <td>25,162</td>
+      <td>0.72x</td>
+      <td><div class="bar cool" style="width:36.0px"></div></td>
+      <td><span class="trend-badge rising">rising</span></td>
+      <td>7</td><td>5</td><td>3</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Business Strategy</td>
+      <td>12</td>
+      <td>44,648</td>
+      <td>1.27x</td>
+      <td><div class="bar " style="width:63.5px"></div></td>
+      <td><span class="trend-badge rising">rising</span></td>
+      <td>5</td><td>4</td><td>3</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Course Launches</td>
+      <td>8</td>
+      <td>29,039</td>
+      <td>0.83x</td>
+      <td><div class="bar " style="width:41.5px"></div></td>
+      <td><span class="trend-badge steady">steady</span></td>
+      <td>2</td><td>4</td><td>2</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Client Acquisition</td>
+      <td>8</td>
+      <td>25,023</td>
+      <td>0.71x</td>
+      <td><div class="bar cool" style="width:35.5px"></div></td>
+      <td><span class="trend-badge steady">steady</span></td>
+      <td>1</td><td>4</td><td>3</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Online Business</td>
+      <td>8</td>
+      <td>42,140</td>
+      <td>1.2x</td>
+      <td><div class="bar " style="width:60.0px"></div></td>
+      <td><span class="trend-badge rising">rising</span></td>
+      <td>5</td><td>3</td><td>0</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Expertise</td>
+      <td>7</td>
+      <td>0</td>
+      <td>0.0x</td>
+      <td><div class="bar cool" style="width:5px"></div></td>
+      <td><span class="trend-badge rising">rising</span></td>
+      <td>4</td><td>0</td><td>3</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Online Courses</td>
+      <td>6</td>
+      <td>0</td>
+      <td>0.0x</td>
+      <td><div class="bar cool" style="width:5px"></div></td>
+      <td><span class="trend-badge rising">rising</span></td>
+      <td>4</td><td>1</td><td>1</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Youtube Strategy</td>
+      <td>6</td>
+      <td>33,501</td>
+      <td>0.95x</td>
+      <td><div class="bar " style="width:47.5px"></div></td>
+      <td><span class="trend-badge dormant">dormant</span></td>
+      <td>0</td><td>3</td><td>3</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Youtube Growth</td>
+      <td>6</td>
+      <td>31,177</td>
+      <td>0.89x</td>
+      <td><div class="bar " style="width:44.5px"></div></td>
+      <td><span class="trend-badge declining">declining</span></td>
+      <td>1</td><td>1</td><td>4</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Scalability</td>
+      <td>6</td>
+      <td>0</td>
+      <td>0.0x</td>
+      <td><div class="bar cool" style="width:5px"></div></td>
+      <td><span class="trend-badge steady">steady</span></td>
+      <td>1</td><td>5</td><td>0</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Audience Building</td>
+      <td>5</td>
+      <td>41,572</td>
+      <td>1.18x</td>
+      <td><div class="bar " style="width:59.0px"></div></td>
+      <td><span class="trend-badge declining">declining</span></td>
+      <td>0</td><td>1</td><td>4</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Entrepreneurship</td>
+      <td>4</td>
+      <td>28,000</td>
+      <td>0.8x</td>
+      <td><div class="bar " style="width:40.0px"></div></td>
+      <td><span class="trend-badge rising">rising</span></td>
+      <td>2</td><td>1</td><td>1</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Mindset</td>
+      <td>4</td>
+      <td>45,017</td>
+      <td>1.28x</td>
+      <td><div class="bar " style="width:64.0px"></div></td>
+      <td><span class="trend-badge rising">rising</span></td>
+      <td>3</td><td>0</td><td>1</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Ai</td>
+      <td>2</td>
+      <td>0</td>
+      <td>0.0x</td>
+      <td><div class="bar cool" style="width:5px"></div></td>
+      <td><span class="trend-badge dormant">dormant</span></td>
+      <td>0</td><td>1</td><td>1</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Coaching Business</td>
+      <td>2</td>
+      <td>0</td>
+      <td>0.0x</td>
+      <td><div class="bar cool" style="width:5px"></div></td>
+      <td><span class="trend-badge steady">steady</span></td>
+      <td>1</td><td>1</td><td>0</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Course Creation</td>
+      <td>2</td>
+      <td>0</td>
+      <td>0.0x</td>
+      <td><div class="bar cool" style="width:5px"></div></td>
+      <td><span class="trend-badge dormant">dormant</span></td>
+      <td>0</td><td>1</td><td>1</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Business Model</td>
+      <td>2</td>
+      <td>44,445</td>
+      <td>1.27x</td>
+      <td><div class="bar " style="width:63.5px"></div></td>
+      <td><span class="trend-badge declining">declining</span></td>
+      <td>0</td><td>0</td><td>2</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Ideal Client</td>
+      <td>2</td>
+      <td>30,020</td>
+      <td>0.86x</td>
+      <td><div class="bar " style="width:43.0px"></div></td>
+      <td><span class="trend-badge declining">declining</span></td>
+      <td>0</td><td>0</td><td>2</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Knowledge Monetization</td>
+      <td>2</td>
+      <td>174,064</td>
+      <td>4.96x</td>
+      <td><div class="bar hot" style="width:100px"></div></td>
+      <td><span class="trend-badge declining">declining</span></td>
+      <td>0</td><td>0</td><td>2</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Business Building</td>
+      <td>2</td>
+      <td>63,095</td>
+      <td>1.8x</td>
+      <td><div class="bar hot" style="width:90.0px"></div></td>
+      <td><span class="trend-badge declining">declining</span></td>
+      <td>0</td><td>0</td><td>2</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Productivity</td>
+      <td>2</td>
+      <td>0</td>
+      <td>0.0x</td>
+      <td><div class="bar cool" style="width:5px"></div></td>
+      <td><span class="trend-badge rising">rising</span></td>
+      <td>2</td><td>0</td><td>0</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Ai In Business</td>
+      <td>2</td>
+      <td>27,799</td>
+      <td>0.79x</td>
+      <td><div class="bar cool" style="width:39.5px"></div></td>
+      <td><span class="trend-badge rising">rising</span></td>
+      <td>2</td><td>0</td><td>0</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Business Models</td>
+      <td>2</td>
+      <td>0</td>
+      <td>0.0x</td>
+      <td><div class="bar cool" style="width:5px"></div></td>
+      <td><span class="trend-badge steady">steady</span></td>
+      <td>1</td><td>1</td><td>0</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Scalable Assets</td>
+      <td>2</td>
+      <td>0</td>
+      <td>0.0x</td>
+      <td><div class="bar cool" style="width:5px"></div></td>
+      <td><span class="trend-badge steady">steady</span></td>
+      <td>1</td><td>1</td><td>0</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Skill Development</td>
+      <td>2</td>
+      <td>0</td>
+      <td>0.0x</td>
+      <td><div class="bar cool" style="width:5px"></div></td>
+      <td><span class="trend-badge rising">rising</span></td>
+      <td>2</td><td>0</td><td>0</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Niche Marketing</td>
+      <td>2</td>
+      <td>0</td>
+      <td>0.0x</td>
+      <td><div class="bar cool" style="width:5px"></div></td>
+      <td><span class="trend-badge dormant">dormant</span></td>
+      <td>0</td><td>1</td><td>1</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Social Media Strategy</td>
+      <td>2</td>
+      <td>0</td>
+      <td>0.0x</td>
+      <td><div class="bar cool" style="width:5px"></div></td>
+      <td><span class="trend-badge dormant">dormant</span></td>
+      <td>0</td><td>1</td><td>1</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Long-Form Content</td>
+      <td>1</td>
+      <td>327,249</td>
+      <td>9.32x</td>
+      <td><div class="bar hot" style="width:100px"></div></td>
+      <td><span class="trend-badge declining">declining</span></td>
+      <td>0</td><td>0</td><td>1</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Youtube Seo</td>
+      <td>1</td>
+      <td>38,215</td>
+      <td>1.09x</td>
+      <td><div class="bar " style="width:54.50000000000001px"></div></td>
+      <td><span class="trend-badge rising">rising</span></td>
+      <td>1</td><td>0</td><td>0</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Pricing Strategy</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0.0x</td>
+      <td><div class="bar cool" style="width:5px"></div></td>
+      <td><span class="trend-badge rising">rising</span></td>
+      <td>1</td><td>0</td><td>0</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Digital Products</td>
+      <td>1</td>
+      <td>43,350</td>
+      <td>1.23x</td>
+      <td><div class="bar " style="width:61.5px"></div></td>
+      <td><span class="trend-badge steady">steady</span></td>
+      <td>0</td><td>1</td><td>0</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Content Creation</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0.0x</td>
+      <td><div class="bar cool" style="width:5px"></div></td>
+      <td><span class="trend-badge declining">declining</span></td>
+      <td>0</td><td>0</td><td>1</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">High Cpm</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0.0x</td>
+      <td><div class="bar cool" style="width:5px"></div></td>
+      <td><span class="trend-badge declining">declining</span></td>
+      <td>0</td><td>0</td><td>1</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Wealth Building</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0.0x</td>
+      <td><div class="bar cool" style="width:5px"></div></td>
+      <td><span class="trend-badge declining">declining</span></td>
+      <td>0</td><td>0</td><td>1</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Expertise Monetization</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0.0x</td>
+      <td><div class="bar cool" style="width:5px"></div></td>
+      <td><span class="trend-badge declining">declining</span></td>
+      <td>0</td><td>0</td><td>1</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Sustainable Business</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0.0x</td>
+      <td><div class="bar cool" style="width:5px"></div></td>
+      <td><span class="trend-badge rising">rising</span></td>
+      <td>1</td><td>0</td><td>0</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Work-Life Balance</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0.0x</td>
+      <td><div class="bar cool" style="width:5px"></div></td>
+      <td><span class="trend-badge rising">rising</span></td>
+      <td>1</td><td>0</td><td>0</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Ai Tools</td>
+      <td>1</td>
+      <td>30,415</td>
+      <td>0.87x</td>
+      <td><div class="bar " style="width:43.5px"></div></td>
+      <td><span class="trend-badge steady">steady</span></td>
+      <td>0</td><td>1</td><td>0</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Push Vs Pull Marketing</td>
+      <td>1</td>
+      <td>231,194</td>
+      <td>6.59x</td>
+      <td><div class="bar hot" style="width:100px"></div></td>
+      <td><span class="trend-badge rising">rising</span></td>
+      <td>1</td><td>0</td><td>0</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Time Management</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0.0x</td>
+      <td><div class="bar cool" style="width:5px"></div></td>
+      <td><span class="trend-badge steady">steady</span></td>
+      <td>0</td><td>1</td><td>0</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Personal Branding</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0.0x</td>
+      <td><div class="bar cool" style="width:5px"></div></td>
+      <td><span class="trend-badge declining">declining</span></td>
+      <td>0</td><td>0</td><td>1</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Business Relaunch</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0.0x</td>
+      <td><div class="bar cool" style="width:5px"></div></td>
+      <td><span class="trend-badge rising">rising</span></td>
+      <td>1</td><td>0</td><td>0</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Automation</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0.0x</td>
+      <td><div class="bar cool" style="width:5px"></div></td>
+      <td><span class="trend-badge steady">steady</span></td>
+      <td>0</td><td>1</td><td>0</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Business Tools</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0.0x</td>
+      <td><div class="bar cool" style="width:5px"></div></td>
+      <td><span class="trend-badge rising">rising</span></td>
+      <td>1</td><td>0</td><td>0</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Burnout Prevention</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0.0x</td>
+      <td><div class="bar cool" style="width:5px"></div></td>
+      <td><span class="trend-badge declining">declining</span></td>
+      <td>0</td><td>0</td><td>1</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Marketing Strategy</td>
+      <td>1</td>
+      <td>231,194</td>
+      <td>6.59x</td>
+      <td><div class="bar hot" style="width:100px"></div></td>
+      <td><span class="trend-badge rising">rising</span></td>
+      <td>1</td><td>0</td><td>0</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Offer Creation</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0.0x</td>
+      <td><div class="bar cool" style="width:5px"></div></td>
+      <td><span class="trend-badge steady">steady</span></td>
+      <td>0</td><td>1</td><td>0</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Content Creation Tools</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0.0x</td>
+      <td><div class="bar cool" style="width:5px"></div></td>
+      <td><span class="trend-badge rising">rising</span></td>
+      <td>1</td><td>0</td><td>0</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Goal Setting</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0.0x</td>
+      <td><div class="bar cool" style="width:5px"></div></td>
+      <td><span class="trend-badge rising">rising</span></td>
+      <td>1</td><td>0</td><td>0</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Scalable Business</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0.0x</td>
+      <td><div class="bar cool" style="width:5px"></div></td>
+      <td><span class="trend-badge declining">declining</span></td>
+      <td>0</td><td>0</td><td>1</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Content Marketing</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0.0x</td>
+      <td><div class="bar cool" style="width:5px"></div></td>
+      <td><span class="trend-badge steady">steady</span></td>
+      <td>0</td><td>1</td><td>0</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Sales Funnels</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0.0x</td>
+      <td><div class="bar cool" style="width:5px"></div></td>
+      <td><span class="trend-badge steady">steady</span></td>
+      <td>0</td><td>1</td><td>0</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Personal Finance</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0.0x</td>
+      <td><div class="bar cool" style="width:5px"></div></td>
+      <td><span class="trend-badge declining">declining</span></td>
+      <td>0</td><td>0</td><td>1</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Solopreneurship</td>
+      <td>1</td>
+      <td>28,930</td>
+      <td>0.82x</td>
+      <td><div class="bar " style="width:41.0px"></div></td>
+      <td><span class="trend-badge declining">declining</span></td>
+      <td>0</td><td>0</td><td>1</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Peace Of Mind</td>
+      <td>1</td>
+      <td>28,930</td>
+      <td>0.82x</td>
+      <td><div class="bar " style="width:41.0px"></div></td>
+      <td><span class="trend-badge declining">declining</span></td>
+      <td>0</td><td>0</td><td>1</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Social Media Marketing</td>
+      <td>1</td>
+      <td>231,194</td>
+      <td>6.59x</td>
+      <td><div class="bar hot" style="width:100px"></div></td>
+      <td><span class="trend-badge rising">rising</span></td>
+      <td>1</td><td>0</td><td>0</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Ai Strategy</td>
+      <td>1</td>
+      <td>39,160</td>
+      <td>1.12x</td>
+      <td><div class="bar " style="width:56.00000000000001px"></div></td>
+      <td><span class="trend-badge declining">declining</span></td>
+      <td>0</td><td>0</td><td>1</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Social Media Growth</td>
+      <td>1</td>
+      <td>106,992</td>
+      <td>3.05x</td>
+      <td><div class="bar hot" style="width:100px"></div></td>
+      <td><span class="trend-badge rising">rising</span></td>
+      <td>1</td><td>0</td><td>0</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Online Education</td>
+      <td>1</td>
+      <td>51,930</td>
+      <td>1.48x</td>
+      <td><div class="bar hot" style="width:74.0px"></div></td>
+      <td><span class="trend-badge declining">declining</span></td>
+      <td>0</td><td>0</td><td>1</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Business Systems</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0.0x</td>
+      <td><div class="bar cool" style="width:5px"></div></td>
+      <td><span class="trend-badge steady">steady</span></td>
+      <td>0</td><td>1</td><td>0</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Burnout</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0.0x</td>
+      <td><div class="bar cool" style="width:5px"></div></td>
+      <td><span class="trend-badge rising">rising</span></td>
+      <td>1</td><td>0</td><td>0</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Social Media Detox</td>
+      <td>1</td>
+      <td>327,249</td>
+      <td>9.32x</td>
+      <td><div class="bar hot" style="width:100px"></div></td>
+      <td><span class="trend-badge declining">declining</span></td>
+      <td>0</td><td>0</td><td>1</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Niche Targeting</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0.0x</td>
+      <td><div class="bar cool" style="width:5px"></div></td>
+      <td><span class="trend-badge declining">declining</span></td>
+      <td>0</td><td>0</td><td>1</td>
+    </tr><tr>
+      <td style="color:#fff;font-weight:600">Authority Building</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0.0x</td>
+      <td><div class="bar cool" style="width:5px"></div></td>
+      <td><span class="trend-badge steady">steady</span></td>
+      <td>0</td><td>1</td><td>0</td>
+    </tr>
+  </table>
+</div>
+
+<div class="grid2">
+<div class="section">
+  <h2>Topic Pairings</h2>
+  <div class="pairs-grid">
+    <div class="pair-chip"><b>Content Strategy + Monetization</b> <span>&times;12</span></div><div class="pair-chip"><b>Business Growth + Monetization</b> <span>&times;12</span></div><div class="pair-chip"><b>Business Growth + Content Strategy</b> <span>&times;10</span></div><div class="pair-chip"><b>Business Strategy + Monetization</b> <span>&times;8</span></div><div class="pair-chip"><b>Course Launches + Monetization</b> <span>&times;7</span></div><div class="pair-chip"><b>Monetization + Youtube Growth</b> <span>&times;6</span></div><div class="pair-chip"><b>Content Strategy + Course Launches</b> <span>&times;6</span></div><div class="pair-chip"><b>Client Acquisition + Monetization</b> <span>&times;6</span></div><div class="pair-chip"><b>Monetization + Youtube Strategy</b> <span>&times;6</span></div><div class="pair-chip"><b>Business Growth + Course Launches</b> <span>&times;5</span></div><div class="pair-chip"><b>Client Acquisition + Youtube Strategy</b> <span>&times;5</span></div><div class="pair-chip"><b>Audience Building + Monetization</b> <span>&times;5</span></div><div class="pair-chip"><b>Business Strategy + Online Business</b> <span>&times;4</span></div><div class="pair-chip"><b>Monetization + Online Business</b> <span>&times;4</span></div><div class="pair-chip"><b>Expertise + Monetization</b> <span>&times;4</span></div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>Quick Stats</h2>
+  <table>
+    <tr><td style="color:#888">Videos Analyzed</td><td style="color:#fff;font-weight:700">49</td></tr>
+    <tr><td style="color:#888">Channel Avg Views</td><td style="color:#fff;font-weight:700">35,104</td></tr>
+    <tr><td style="color:#888">Topics Tracked</td><td style="color:#fff;font-weight:700">30</td></tr>
+    <tr><td style="color:#888">Unique Pairings</td><td style="color:#fff;font-weight:700">20</td></tr>
+    <tr><td style="color:#888">Rising Topics</td><td style="color:#6bcb77;font-weight:700">23</td></tr>
+    <tr><td style="color:#888">Declining Topics</td><td style="color:#ff6b6b;font-weight:700">22</td></tr>
+  </table>
+</div>
+</div>
+
+<div class="section"><h2>Strategic Recommendations</h2><div class="recs">Here's a content strategy analysis of Sunny Lenarduzzi's YouTube channel, based on the provided data:<br><br>## YouTube Content Strategy Analysis: Sunny Lenarduzzi<br><br>Channel Average Views: 35,104<br><br>### 1. HIGHEST-ROI CONTENT<br><br>The sweet spot for high return on investment (ROI) lies in topics that perform well and are also trending upwards in frequency.<br><br>*   "Social Media Detox" and "Long-Form Content": These topics have the highest average views at 327,249. While not explicitly listed as "rising," their exceptional performance suggests they are evergreen and should be revisited.<br>*   "Marketing Strategy" and "Social Media Marketing": These topics also show strong performance with 231,194 average views. Given that "Business Strategy" and "Monetization" are rising topics, integrating these high-performing marketing concepts into broader business strategy discussions could yield excellent results.<br><br>### 2. HIDDEN GEMS<br><br>These are topics with high average views but a relatively low frequency, indicating an opportunity to create more content around them.<br><br>*   "Social Media Detox" (327,249 views): This topic has the highest average views but is not listed in the top topics by frequency, nor is it a rising topic. This is a significant "hidden gem" where more content could be highly impactful.<br>*   "Long-Form Content" (327,249 views): Similar to "Social Media Detox," this topic has exceptional performance and low frequency, presenting a clear opportunity.<br><br>### 3. DORMANT WINNERS<br><br>There are no explicitly "dormant" or "declining" topics with strong performance indicated in the provided data. This suggests a consistent content strategy that hasn't significantly shifted away from successful themes.<br><br>### 4. RISING BETS<br><br>Sunny Lenarduzzi is leaning into "Monetization," "Business Strategy," "Youtube Growth," "Online Business," "Online Courses," and "Expertise." Let's see how these are paying off in views:<br><br>*   "Monetization" (35 frequency): While this is the most frequent topic, its average view count isn't explicitly provided in the "TOP TOPICS BY PERFORMANCE" list. However, its high frequency suggests it's a core focus and likely contributes significantly to overall channel performance.<br>*   "Business Strategy" (12 frequency): This is a rising topic and is paired with "Monetization" (8 times) and "Business Growth" (8 times). The average view count for "Business Strategy" isn't directly listed, but its pairing with high-performing topics suggests it's a valuable area.<br>*   "Youtube Growth" (6 frequency): This is a rising topic and is paired with "Monetization" (6 times). Its performance needs to be monitored, but its inclusion in rising topics indicates a strategic focus.<br><br>### 5. TOPIC COMBOS<br><br>The most effective topic pairings are:<br><br>*   "Content Strategy + Monetization" (12 pairings): This combination is the most frequent, indicating a strong audience interest in how to create content that generates revenue.<br>*   "Business Growth + Monetization" (12 pairings): This pairing is equally strong, highlighting the audience's desire to grow their businesses through monetization strategies.<br>*   "Business Growth + Content Strategy" (10 pairings): This combination is also highly successful, showing a clear connection between creating content and achieving business expansion.<br><br>New Combinations to Try:<br><br>*   "Social Media Detox + Monetization": Given the high performance of "Social Media Detox" and the rising trend of "Monetization," exploring how to monetize content *without* burnout or by creating content *about* managing digital well-being could be a lucrative new avenue.<br>*   "Long-Form Content + Business Strategy": Leverage the high views of "Long-Form Content" by discussing how strategic, in-depth content can be used to build authority and drive business growth.<br><br>### 6. SPECIFIC CONTENT IDEAS<br><br>Based on the analysis, here are five specific video ideas:<br><br>1.  Video Idea: "The Ultimate Guide to Monetizing Your Long-Form Content in 2026"<br>    *   Rationale: This combines the highest-performing topic ("Long-Form Content" with 327,249 views) with the most frequent and rising topic ("Monetization"). It directly addresses a high-interest area for the audience.<br>2.  Video Idea: "How to Achieve a Social Media Detox Without Losing Business Momentum"<br>    *   Rationale: This leverages the exceptional performance of "Social Media Detox" (327,249 views) and addresses a common pain point for entrepreneurs. It can be framed as a strategic approach to content creation and business management.<br>3.  Video Idea: "Building Authority: The Power of Niche Expertise in a Crowded Online Space"<br>    *   Rationale: This taps into the "Expertise" topic, which is rising in frequency, and connects it to the concept of "Niche" which is often associated with higher CPMs and targeted audiences, as highlighted in the [youtubetoolshub.com] articles on profitable niches. This can be framed as a business growth strategy.<br>4.  Video Idea: "Sunny's Top 5 Business Tools for Streamlining Content Strategy and Monetization"<br>    *   Rationale: This combines the rising topics of "Business Tools" and "Business Strategy" with the core themes of "Content Strategy" and "Monetization." It provides actionable advice and leverages Sunny's authority.<br>5.  Video Idea: "From Zero to Launch: A Step-by-Step Blueprint for Your First Online Course"<br>    *   Rationale: This directly addresses "Online Courses" and "Course Launches," which are frequent and rising topics. It also aligns with "Monetization" and "Business Growth," offering a practical, step-by-step guide that resonates with aspiring entrepreneurs.</div></div>
+
+</div>
+</body></html>

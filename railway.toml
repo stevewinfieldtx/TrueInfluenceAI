@@ -1,0 +1,10 @@
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "cd web && python server.py"
+healthcheckPath = "/api/creators"
+healthcheckTimeout = 30
+
+[service]
+internalPort = 8200

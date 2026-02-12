@@ -1,0 +1,41 @@
+[KEY] YouTube API Key: AIzaSyDM...8STA
+[BUNDLE] Enriching: SunnyLenarduzzi_20260211_164612
+
+[STATS] Fetching stats for 50 videos...
+  50/50 video stats fetched
+
+  Channel Averages:
+     Views:    35,104
+     Likes:    1,637
+     Comments: 948
+     Engagement Rate: 7.37%
+
+[COMMENTS] Fetching comments...
+  5/20 videos comments fetched
+  10/20 videos comments fetched
+  15/20 videos comments fetched
+  20/20 videos comments fetched
+  Got comments for 20 videos
+
+  Top 5 Videos by Views:
+        327,249 views (9.3x avg)  How I Make $500K/Month Without Social Media
+        231,194 views (6.6x avg)  Social Media is Over, Here's What Will Grow Your Business
+        106,992 views (3.0x avg)  The Anti-Social Media Strategy That Will Grow Your Business
+        103,997 views (3.0x avg)  The Smartest Way to Make Money on YouTube from Day One
+         59,961 views (1.7x avg)  Watch me Create a $1M YouTube Channel in 38 Minutes (Using A
+
+  Most Discussed (by comment count):
+     14,057 comments  How I Make $500K/Month Without Social Media
+      3,898 comments  Social Media is Over, Here's What Will Grow Your Business
+      2,693 comments  How to Build a $10K/Month Business Before The Year Ends
+      2,180 comments  The Smartest Way to Make Money on YouTube from Day One
+      1,869 comments  The Anti-Social Media Strategy That Will Grow Your Business
+
+  Lowest Performers:
+          6,961 views (0.2x avg)  Why I Burned Down & Relaunched My Business with AI
+          6,615 views (0.2x avg)  The Boring Way to Make $1M (Using Skills You Already Have)
+          4,915 views (0.1x avg)  My Strategy To Work Less (And Earn More) In 2026
+
+[DONE] Bundle enriched! Now re-run:
+   py analytics.py SunnyLenarduzzi_20260211_164612
+   py dashboard.py SunnyLenarduzzi_20260211_164612

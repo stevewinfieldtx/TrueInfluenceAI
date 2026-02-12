@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analyze Your Channel - TrueInfluenceAI</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Fraunces:ital,opsz,wght@0,9..144,700;0,9..144,900;1,9..144,700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #06070b; --surface: #0c0d14; --surface-2: #12131d; --border: #1a1c2e;
+  --accent: #7c6aff; --accent-glow: #a090ff; --accent-dim: rgba(124,106,255,.08);
+  --text: #b0b1c0; --bright: #eeeef6; --muted: #4e5068;
+  --green: #45d483; --coral: #ff6b7a; --gold: #f0c040;
+}
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Outfit', sans-serif; background:var(--bg); color:var(--text); min-height:100vh; display:flex; flex-direction:column; align-items:center; }
+nav { width:100%; padding:18px 48px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border); background:var(--surface); }
+.logo { font-family:'Fraunces', serif; font-size:24px; font-weight:900; color:var(--bright); }
+.logo span { color:var(--accent); }
+.logo a { color:inherit; text-decoration:none; }
+nav a.back { color:var(--muted); font-size:14px; text-decoration:none; }
+nav a.back:hover { color:var(--bright); }
+.container { max-width:640px; width:100%; padding:80px 24px; }
+h1 { font-family:'Fraunces', serif; font-size:36px; font-weight:900; color:var(--bright); text-align:center; margin-bottom:12px; }
+.subtitle { text-align:center; color:var(--muted); font-size:16px; margin-bottom:48px; line-height:1.6; }
+.form-card { background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:40px 36px; margin-bottom:32px; }
+.field { margin-bottom:24px; }
+.field label { display:block; font-size:13px; font-weight:600; color:var(--bright); margin-bottom:8px; letter-spacing:.3px; }
+.field .hint { font-size:12px; color:var(--muted); margin-top:4px; }
+.field input, .field select { width:100%; padding:14px 18px; background:var(--bg); border:1px solid var(--border); border-radius:10px; color:var(--bright); font-size:15px; font-family:inherit; outline:none; transition:border-color .2s; }
+.field input:focus { border-color:var(--accent); }
+.field input::placeholder { color:var(--muted); }
+.submit-btn { width:100%; padding:16px; background:var(--accent); color:#fff; border:none; border-radius:12px; font-size:16px; font-weight:700; cursor:pointer; font-family:inherit; transition:all .25s; }
+.submit-btn:hover { background:var(--accent-glow); transform:translateY(-1px); box-shadow:0 6px 24px rgba(124,106,255,.3); }
+.submit-btn:disabled { opacity:.5; cursor:not-allowed; transform:none; box-shadow:none; }
+.progress-panel { display:none; background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:40px 36px; text-align:center; }
+.progress-panel.active { display:block; }
+.progress-bar-wrap { width:100%; height:8px; background:var(--bg); border-radius:4px; margin:24px 0 16px; overflow:hidden; }
+.progress-bar { height:100%; background:linear-gradient(90deg, var(--accent), var(--accent-glow)); border-radius:4px; transition:width .5s ease; width:0%; }
+.progress-step { font-size:14px; color:var(--text); margin-bottom:8px; }
+.progress-pct { font-family:'Fraunces', serif; font-size:48px; font-weight:900; color:var(--bright); }
+.result-panel { display:none; background:var(--surface); border:1px solid var(--green); border-radius:20px; padding:40px 36px; text-align:center; }
+.result-panel.active { display:block; }
+.result-panel h2 { font-family:'Fraunces', serif; font-size:28px; color:var(--bright); margin-bottom:12px; }
+.result-panel .view-btn { display:inline-block; padding:14px 36px; background:var(--accent); color:#fff; border-radius:10px; font-weight:700; font-size:15px; text-decoration:none; margin-top:20px; transition:all .25s; }
+.result-panel .view-btn:hover { background:var(--accent-glow); }
+.error-panel { display:none; background:var(--surface); border:1px solid var(--coral); border-radius:20px; padding:40px 36px; text-align:center; }
+.error-panel.active { display:block; }
+.error-panel h2 { color:var(--coral); margin-bottom:12px; }
+.pipeline-steps { margin-top:24px; text-align:left; padding:0 20px; }
+.pipeline-steps .ps { padding:8px 0; font-size:13px; color:var(--muted); border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px; }
+.pipeline-steps .ps.done { color:var(--green); }
+.pipeline-steps .ps.active { color:var(--bright); font-weight:600; }
+.pipeline-steps .ps .icon { width:20px; text-align:center; }
+</style>
+</head>
+<body>
+<nav>
+  <div class="logo"><a href="/"><span>TrueInfluence</span>AI</a></div>
+  <a href="/" class="back">Back to Home</a>
+</nav>
+<div class="container">
+  <h1>Analyze Your Channel</h1>
+  <p class="subtitle">Enter your YouTube channel URL and we'll build your complete<br>content intelligence hub in about 5 minutes.</p>
+  <div class="form-card" id="formCard">
+    <div class="field">
+      <label>YouTube Channel URL</label>
+      <input type="url" id="channelUrl" placeholder="https://www.youtube.com/@YourChannel" required>
+      <div class="hint">Paste the full URL of the YouTube channel you want to analyze</div>
+    </div>
+    <div class="field">
+      <label>Creator / Channel Name</label>
+      <input type="text" id="creatorName" placeholder="e.g. Sunny Lenarduzzi">
+      <div class="hint">Optional - we'll pull this from the channel if left blank</div>
+    </div>
+    <div class="field">
+      <label>Videos to Analyze</label>
+      <select id="maxVideos" style="background:var(--bg);color:var(--bright);padding:14px 18px;border:1px solid var(--border);border-radius:10px;font-size:15px;font-family:inherit;width:100%">
+        <option value="20">20 videos (fastest, ~2 min)</option>
+        <option value="50" selected>50 videos (recommended, ~5 min)</option>
+        <option value="100">100 videos (deep analysis, ~8 min)</option>
+      </select>
+    </div>
+    <button class="submit-btn" id="submitBtn" onclick="startOnboarding()">Start Analysis</button>
+  </div>
+  <div class="progress-panel" id="progressPanel">
+    <div class="progress-pct" id="progressPct">0%</div>
+    <div class="progress-bar-wrap"><div class="progress-bar" id="progressBar"></div></div>
+    <div class="progress-step" id="progressStep">Initializing...</div>
+    <div class="pipeline-steps" id="pipelineSteps">
+      <div class="ps" data-step="scan"><span class="icon">...</span> Scanning channel videos</div>
+      <div class="ps" data-step="transcripts"><span class="icon">...</span> Pulling transcripts</div>
+      <div class="ps" data-step="embed"><span class="icon">...</span> Embedding content chunks</div>
+      <div class="ps" data-step="enrich"><span class="icon">...</span> Enriching with YouTube analytics</div>
+      <div class="ps" data-step="voice"><span class="icon">...</span> Building voice profile</div>
+      <div class="ps" data-step="insights"><span class="icon">...</span> Generating strategic insights</div>
+      <div class="ps" data-step="analytics"><span class="icon">...</span> Running topic analytics</div>
+      <div class="ps" data-step="pages"><span class="icon">...</span> Building creator pages</div>
+    </div>
+  </div>
+  <div class="result-panel" id="resultPanel">
+    <h2>Your Intelligence Hub is Ready!</h2>
+    <p style="color:var(--muted);margin-bottom:8px" id="resultSummary"></p>
+    <a href="#" class="view-btn" id="resultLink">View Your Dashboard</a>
+  </div>
+  <div class="error-panel" id="errorPanel">
+    <h2>Something went wrong</h2>
+    <p style="color:var(--muted)" id="errorMsg"></p>
+    <button class="submit-btn" style="margin-top:20px;max-width:200px;margin-left:auto;margin-right:auto" onclick="location.reload()">Try Again</button>
+  </div>
+</div>
+<script>
+let pollInterval = null;
+async function startOnboarding() {
+  const url = document.getElementById('channelUrl').value.trim();
+  const name = document.getElementById('creatorName').value.trim();
+  const max = document.getElementById('maxVideos').value;
+  if (!url) { alert('Please enter a YouTube channel URL'); return; }
+  if (!url.includes('youtube.com') && !url.includes('youtu.be')) { alert('Please enter a valid YouTube channel URL'); return; }
+  document.getElementById('formCard').style.display = 'none';
+  document.getElementById('progressPanel').classList.add('active');
+  document.getElementById('submitBtn').disabled = true;
+  try {
+    const resp = await fetch('/api/onboard', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ channel_url: url, creator_name: name, max_videos: parseInt(max) })
+    });
+    const data = await resp.json();
+    if (data.status === 'exists') {
+      document.getElementById('progressPanel').classList.remove('active');
+      document.getElementById('resultPanel').classList.add('active');
+      document.getElementById('resultSummary').textContent = data.message;
+      document.getElementById('resultLink').href = data.url;
+      return;
+    }
+    if (data.status === 'started') { pollInterval = setInterval(() => pollStatus(data.job_id), 3000); }
+  } catch (e) { showError(e.message); }
+}
+async function pollStatus(jobId) {
+  try {
+    const resp = await fetch(`/api/status/${jobId}`);
+    const job = await resp.json();
+    const pct = job.progress || 0;
+    document.getElementById('progressPct').textContent = pct + '%';
+    document.getElementById('progressBar').style.width = pct + '%';
+    document.getElementById('progressStep').textContent = job.step || '';
+    updatePipelineSteps(pct);
+    if (job.status === 'complete') {
+      clearInterval(pollInterval);
+      document.getElementById('progressPanel').classList.remove('active');
+      document.getElementById('resultPanel').classList.add('active');
+      document.getElementById('resultSummary').textContent = `Analysis complete for ${job.creator_name}`;
+      document.getElementById('resultLink').href = job.url || `/c/${job.slug}`;
+    }
+    if (job.status === 'error') { clearInterval(pollInterval); showError(job.error || 'Unknown error occurred'); }
+  } catch (e) { }
+}
+function updatePipelineSteps(pct) {
+  const steps = [{key:'scan',at:10},{key:'transcripts',at:20},{key:'embed',at:35},{key:'enrich',at:50},{key:'voice',at:60},{key:'insights',at:70},{key:'analytics',at:80},{key:'pages',at:90}];
+  steps.forEach(s => {
+    const el = document.querySelector(`.ps[data-step="${s.key}"]`);
+    if (!el) return;
+    if (pct >= s.at + 10) { el.classList.add('done'); el.classList.remove('active'); el.querySelector('.icon').textContent = 'OK'; }
+    else if (pct >= s.at) { el.classList.add('active'); el.classList.remove('done'); el.querySelector('.icon').textContent = '>>'; }
+  });
+}
+function showError(msg) {
+  document.getElementById('progressPanel').classList.remove('active');
+  document.getElementById('errorPanel').classList.add('active');
+  document.getElementById('errorMsg').textContent = msg;
+}
+</script>
+</body>
+</html>

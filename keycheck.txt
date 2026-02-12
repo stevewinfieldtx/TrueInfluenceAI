@@ -1,0 +1,5 @@
+KEY LENGTH: 73
+KEY START: sk-or-v1-97d8b4e345b...
+KEY SET: True
+STATUS: 401
+RESPONSE: {"error":{"message":"User not found.","code":401}}

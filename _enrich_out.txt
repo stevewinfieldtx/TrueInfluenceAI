@@ -1,0 +1,11 @@
+🔑 YouTube API Key: AIzaSyDM...8STA
+📦 Enriching: SunnyLenarduzzi_20260211_164612
+
+📊 Fetching stats for 50 videos...
+
+  ❌ API returned 403 Forbidden.
+     Your YouTube Data API v3 key may not be enabled.
+     Go to: https://console.cloud.google.com/apis/library/youtube.googleapis.com
+     Click 'Enable', then re-run this script.
+
+❌ Enrichment failed. Check API key status.

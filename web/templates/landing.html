@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>TrueInfluenceAI — Your Content, Amplified</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,700;0,9..144,900;1,9..144,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #06070b;
+  --surface: #0c0e16;
+  --surface-2: #12141f;
+  --border: #1a1d2e;
+  --border-lit: #2a2e44;
+  --accent: #6366f1;
+  --accent-bright: #818cf8;
+  --accent-dim: rgba(99,102,241,.12);
+  --coral: #f472b6;
+  --emerald: #34d399;
+  --amber: #fbbf24;
+  --text: #b8bcd0;
+  --text-bright: #eef0ff;
+  --text-muted: #4a4e6a;
+  --radius: 16px;
+}
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior: smooth; }
+body { font-family:'Outfit', sans-serif; background:var(--bg); color:var(--text); overflow-x:hidden; -webkit-font-smoothing:antialiased; }
+a { color:var(--accent-bright); text-decoration:none; }
+
+/* ── NAV ── */
+nav {
+  position:fixed; top:0; left:0; right:0; z-index:100;
+  padding:18px 48px; display:flex; align-items:center; justify-content:space-between;
+  background:rgba(6,7,11,.8); backdrop-filter:blur(24px) saturate(1.4);
+  border-bottom:1px solid rgba(26,29,46,.6);
+  transition: all .3s;
+}
+nav.scrolled { padding:12px 48px; background:rgba(6,7,11,.95); }
+.logo { font-family:'Fraunces', serif; font-size:24px; font-weight:900; color:var(--text-bright); letter-spacing:-0.5px; }
+.logo span { background:linear-gradient(135deg, var(--accent), var(--coral)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.nav-links { display:flex; gap:32px; align-items:center; }
+.nav-links a { color:var(--text-muted); font-size:14px; font-weight:500; transition:color .2s; }
+.nav-links a:hover { color:var(--text-bright); }
+.nav-cta {
+  padding:10px 28px; border-radius:10px; font-size:13px; font-weight:700;
+  background:var(--accent); color:#fff !important; transition:all .2s;
+  -webkit-text-fill-color:#fff !important;
+}
+.nav-cta:hover { background:var(--accent-bright); transform:translateY(-1px); box-shadow:0 4px 24px rgba(99,102,241,.3); }
+
+/* ── HERO ── */
+.hero {
+  padding:180px 48px 120px; text-align:center; position:relative; overflow:hidden;
+}
+.hero::before {
+  content:''; position:absolute; top:-300px; left:50%; transform:translateX(-50%);
+  width:1200px; height:1200px;
+  background: radial-gradient(ellipse at center, rgba(99,102,241,.06) 0%, rgba(244,114,182,.03) 40%, transparent 70%);
+  pointer-events:none;
+}
+.hero::after {
+  content:''; position:absolute; top:0; left:0; right:0; bottom:0;
+  background: repeating-linear-gradient(90deg, rgba(99,102,241,.02) 0px, transparent 1px, transparent 120px);
+  pointer-events:none;
+}
+.hero .badge {
+  display:inline-flex; align-items:center; gap:8px;
+  padding:6px 16px; border-radius:100px; font-size:12px; font-weight:600;
+  background:var(--accent-dim); color:var(--accent-bright); border:1px solid rgba(99,102,241,.2);
+  margin-bottom:28px;
+}
+.hero .badge .dot { width:6px; height:6px; border-radius:50%; background:var(--emerald); animation:pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+.hero h1 {
+  font-family:'Fraunces', serif; font-size:clamp(44px, 6vw, 76px); font-weight:900;
+  color:var(--text-bright); line-height:1.05; max-width:860px; margin:0 auto 24px;
+  letter-spacing:-1.5px;
+}
+.hero h1 em {
+  font-style:italic;
+  background:linear-gradient(135deg, var(--accent-bright), var(--coral));
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+}
+.hero .sub {
+  font-size:19px; color:var(--text-muted); max-width:560px;
+  margin:0 auto 48px; line-height:1.7; font-weight:300;
+}
+
+/* ── ONBOARDING FORM ── */
+.onboard-box {
+  max-width:640px; margin:0 auto; padding:3px; border-radius:16px;
+  background:linear-gradient(135deg, rgba(99,102,241,.3), rgba(244,114,182,.2), rgba(99,102,241,.1));
+  position:relative; z-index:2;
+}
+.onboard-inner {
+  background:var(--surface-2); border-radius:14px; padding:32px;
+}
+.onboard-inner h3 {
+  font-size:16px; font-weight:700; color:var(--text-bright); margin-bottom:4px;
+}
+.onboard-inner .hint {
+  font-size:13px; color:var(--text-muted); margin-bottom:20px;
+}
+.input-row { display:flex; gap:12px; }
+.input-row input {
+  flex:1; padding:14px 20px; border-radius:12px;
+  background:var(--bg); border:1px solid var(--border);
+  color:var(--text-bright); font-size:15px; font-family:'Outfit', sans-serif;
+  outline:none; transition:border-color .2s;
+}
+.input-row input:focus { border-color:var(--accent); }
+.input-row input::placeholder { color:var(--text-muted); }
+.input-row button {
+  padding:14px 32px; border-radius:12px; border:none;
+  background:var(--accent); color:#fff; font-size:15px; font-weight:700;
+  cursor:pointer; transition:all .2s; font-family:'Outfit', sans-serif;
+  white-space:nowrap;
+}
+.input-row button:hover { background:var(--accent-bright); transform:translateY(-1px); box-shadow:0 4px 20px rgba(99,102,241,.3); }
+.input-row button:disabled { opacity:.5; cursor:not-allowed; transform:none; }
+
+/* Job status */
+.job-status {
+  display:none; margin-top:20px; padding:16px 20px;
+  background:var(--bg); border-radius:12px; border:1px solid var(--border);
+}
+.job-status.active { display:block; }
+.job-step { font-size:14px; color:var(--accent-bright); font-weight:500; margin-bottom:8px; }
+.job-progress {
+  height:4px; border-radius:4px; background:var(--border); overflow:hidden;
+}
+.job-progress-bar {
+  height:100%; border-radius:4px; width:0%;
+  background:linear-gradient(90deg, var(--accent), var(--coral));
+  transition:width .5s;
+}
+.job-result {
+  display:none; margin-top:12px; padding:12px 16px;
+  background:rgba(52,211,153,.08); border:1px solid rgba(52,211,153,.2);
+  border-radius:10px;
+}
+.job-result.active { display:block; }
+.job-result a { color:var(--emerald); font-weight:700; }
+
+/* ── SOCIAL PROOF ── */
+.proof {
+  padding:48px; text-align:center;
+  border-top:1px solid var(--border); border-bottom:1px solid var(--border);
+  background:var(--surface);
+}
+.proof-label { font-size:12px; color:var(--text-muted); letter-spacing:2px; text-transform:uppercase; margin-bottom:24px; }
+.stats-row { display:flex; justify-content:center; gap:64px; flex-wrap:wrap; }
+.stat-item { text-align:center; }
+.stat-num { font-family:'Fraunces', serif; font-size:40px; font-weight:900; color:var(--text-bright); }
+.stat-label { font-size:12px; color:var(--text-muted); margin-top:4px; text-transform:uppercase; letter-spacing:1px; }
+
+/* ── VALUE PROPS ── */
+.section {
+  padding:120px 48px; max-width:1200px; margin:0 auto;
+}
+.section-eyebrow {
+  font-size:12px; font-weight:700; color:var(--accent-bright);
+  text-transform:uppercase; letter-spacing:3px; margin-bottom:14px;
+}
+.section-title {
+  font-family:'Fraunces', serif; font-size:clamp(30px, 4vw, 48px); font-weight:900;
+  color:var(--text-bright); line-height:1.1; margin-bottom:16px; letter-spacing:-0.5px;
+}
+.section-sub {
+  font-size:17px; color:var(--text-muted); max-width:540px; line-height:1.7;
+  margin-bottom:56px; font-weight:300;
+}
+
+/* How it works */
+.steps-grid {
+  display:grid; grid-template-columns:repeat(3, 1fr); gap:28px;
+}
+.step-card {
+  padding:36px 28px; background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); transition:all .3s; position:relative; overflow:hidden;
+}
+.step-card:hover { border-color:var(--accent-dim); transform:translateY(-4px); }
+.step-card::before {
+  content:attr(data-num); position:absolute; top:12px; right:16px;
+  font-family:'Fraunces', serif; font-size:56px; font-weight:900;
+  color:var(--accent); opacity:.06;
+}
+.step-card .step-icon { font-size:36px; margin-bottom:16px; }
+.step-card h3 { font-size:17px; font-weight:700; color:var(--text-bright); margin-bottom:8px; }
+.step-card p { font-size:14px; color:var(--text-muted); line-height:1.6; }
+.step-card .step-tag {
+  display:inline-block; margin-top:14px; padding:4px 14px; border-radius:20px;
+  font-size:11px; font-weight:600; background:var(--accent-dim); color:var(--accent-bright);
+}
+
+/* Features */
+.features-grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:28px; }
+.feature-card {
+  padding:36px 32px; background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); transition:all .3s;
+}
+.feature-card:hover { border-color:rgba(99,102,241,.25); }
+.feature-card .feat-icon { font-size:28px; margin-bottom:14px; }
+.feature-card h3 { font-size:17px; font-weight:700; color:var(--text-bright); margin-bottom:8px; }
+.feature-card p { font-size:14px; color:var(--text-muted); line-height:1.6; }
+
+/* Pricing */
+.pricing-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:28px; align-items:start; }
+.price-card {
+  padding:40px 32px; background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); text-align:center; transition:all .3s;
+}
+.price-card.featured {
+  border-color:var(--accent); background:var(--surface-2);
+  box-shadow:0 0 60px rgba(99,102,241,.08);
+  transform:scale(1.03);
+}
+.price-card .price-name { font-size:14px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:2px; margin-bottom:12px; }
+.price-card .price-amount {
+  font-family:'Fraunces', serif; font-size:48px; font-weight:900; color:var(--text-bright); margin-bottom:4px;
+}
+.price-card .price-amount span { font-size:18px; font-weight:400; color:var(--text-muted); }
+.price-card .price-period { font-size:13px; color:var(--text-muted); margin-bottom:24px; }
+.price-card ul { list-style:none; text-align:left; margin-bottom:28px; }
+.price-card li {
+  padding:8px 0; font-size:14px; color:var(--text); border-bottom:1px solid var(--border);
+  display:flex; align-items:center; gap:10px;
+}
+.price-card li::before { content:'✓'; color:var(--emerald); font-weight:700; font-size:13px; }
+.price-card .price-btn {
+  display:block; padding:14px; border-radius:12px; font-size:14px; font-weight:700;
+  text-decoration:none; transition:all .2s;
+  background:var(--accent-dim); color:var(--accent-bright); border:1px solid rgba(99,102,241,.2);
+}
+.price-card.featured .price-btn { background:var(--accent); color:#fff; border-color:transparent; }
+.price-card .price-btn:hover { transform:translateY(-2px); }
+
+/* ── EXISTING CREATORS ── */
+.creators-grid { display:flex; gap:20px; flex-wrap:wrap; justify-content:center; margin-top:40px; }
+.creator-chip {
+  display:flex; align-items:center; gap:12px;
+  padding:12px 20px; background:var(--surface); border:1px solid var(--border);
+  border-radius:12px; transition:all .2s; text-decoration:none; color:var(--text);
+}
+.creator-chip:hover { border-color:var(--accent); transform:translateY(-2px); }
+.creator-chip .cc-avatar {
+  width:40px; height:40px; border-radius:50%;
+  background:linear-gradient(135deg, var(--accent), var(--coral));
+  display:flex; align-items:center; justify-content:center;
+  font-size:16px; font-weight:800; color:#fff;
+}
+.creator-chip .cc-name { font-size:14px; font-weight:600; color:var(--text-bright); }
+.creator-chip .cc-meta { font-size:11px; color:var(--text-muted); }
+
+/* ── FOOTER ── */
+footer {
+  padding:60px 48px; text-align:center; border-top:1px solid var(--border);
+  background:var(--surface);
+}
+footer .foot-logo { font-family:'Fraunces', serif; font-size:20px; font-weight:900; color:var(--text-bright); margin-bottom:8px; }
+footer .foot-logo span { color:var(--accent); }
+footer .foot-text { font-size:13px; color:var(--text-muted); margin-bottom:16px; }
+footer .foot-links { display:flex; gap:24px; justify-content:center; }
+footer .foot-links a { font-size:13px; color:var(--text-muted); }
+footer .foot-links a:hover { color:var(--text-bright); }
+
+/* ── RESPONSIVE ── */
+@media(max-width:900px) {
+  nav { padding:14px 20px; }
+  .hero { padding:140px 20px 80px; }
+  .section { padding:80px 20px; }
+  .steps-grid, .features-grid { grid-template-columns:1fr; }
+  .pricing-grid { grid-template-columns:1fr; }
+  .price-card.featured { transform:none; }
+  .stats-row { gap:32px; }
+  .input-row { flex-direction:column; }
+}
+
+/* ── ANIMATIONS ── */
+@keyframes fadeInUp {
+  from { opacity:0; transform:translateY(24px); }
+  to { opacity:1; transform:translateY(0); }
+}
+.anim { opacity:0; animation:fadeInUp .6s ease forwards; }
+.anim-d1 { animation-delay:.1s; }
+.anim-d2 { animation-delay:.2s; }
+.anim-d3 { animation-delay:.3s; }
+.anim-d4 { animation-delay:.4s; }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav id="nav">
+  <div class="logo">True<span>Influence</span>AI</div>
+  <div class="nav-links">
+    <a href="#how">How It Works</a>
+    <a href="#features">Features</a>
+    <a href="#pricing">Pricing</a>
+    <a href="#start" class="nav-cta">Get Started Free</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="badge anim"><span class="dot"></span> Now in Early Access</div>
+  <h1 class="anim anim-d1">Give your audience<br><em>deeper access</em> to you</h1>
+  <p class="sub anim anim-d2">
+    Your content is a goldmine of expertise. TrueInfluenceAI turns it into an
+    always-on AI that speaks in your voice, so your audience gets personalized
+    answers — and you get a new revenue stream.
+  </p>
+
+  <!-- ONBOARDING -->
+  <div class="onboard-box anim anim-d3" id="start">
+    <div class="onboard-inner">
+      <h3>Analyze your channel in minutes</h3>
+      <p class="hint">Paste your YouTube channel URL or handle — we'll do the rest.</p>
+      <div class="input-row">
+        <input type="text" id="channel-input" placeholder="https://youtube.com/@YourChannel" autocomplete="off">
+        <button id="go-btn" onclick="startOnboarding()">Analyze →</button>
+      </div>
+      <div class="job-status" id="job-status">
+        <div class="job-step" id="job-step">Starting...</div>
+        <div class="job-progress"><div class="job-progress-bar" id="job-bar"></div></div>
+      </div>
+      <div class="job-result" id="job-result">
+        <span style="color:var(--emerald);font-weight:600">✓ Your AI is ready!</span>
+        <a id="result-link" href="#" target="_blank">View your creator intelligence →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SOCIAL PROOF -->
+<div class="proof">
+  <div class="proof-label">Built for creators who take their content seriously</div>
+  <div class="stats-row">
+    <div class="stat-item"><div class="stat-num">50+</div><div class="stat-label">Videos Analyzed</div></div>
+    <div class="stat-item"><div class="stat-num">66</div><div class="stat-label">Topics Mapped</div></div>
+    <div class="stat-item"><div class="stat-num">< 5 min</div><div class="stat-label">Setup Time</div></div>
+    <div class="stat-item"><div class="stat-num">24/7</div><div class="stat-label">AI Availability</div></div>
+  </div>
+</div>
+
+<!-- HOW IT WORKS -->
+<section class="section" id="how">
+  <div class="section-eyebrow">How It Works</div>
+  <div class="section-title">Three steps. Your AI twin is live.</div>
+  <div class="section-sub">We analyze your entire content library, learn your voice and expertise, and create an AI that your audience can interact with — as if they were talking directly to you.</div>
+
+  <div class="steps-grid">
+    <div class="step-card" data-num="1">
+      <div class="step-icon">🔗</div>
+      <h3>Connect Your Channel</h3>
+      <p>Paste your YouTube URL. We scan your videos, pull transcripts, and analyze every piece of content you've created.</p>
+      <span class="step-tag">~2 minutes</span>
+    </div>
+    <div class="step-card" data-num="2">
+      <div class="step-icon">🧠</div>
+      <h3>AI Learns Your Voice</h3>
+      <p>Our engine maps your topics, speaking style, expertise areas, and strategic evolution. It understands who you are <em>now</em>, not just who you were.</p>
+      <span class="step-tag">~3 minutes</span>
+    </div>
+    <div class="step-card" data-num="3">
+      <div class="step-icon">🚀</div>
+      <h3>Your Audience Subscribes</h3>
+      <p>Fans get a personal AI that answers questions in your voice, surfaces your best content, and delivers insights on demand. You earn from every subscriber.</p>
+      <span class="step-tag">Ongoing revenue</span>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="section" id="features">
+  <div class="section-eyebrow">What Your Audience Gets</div>
+  <div class="section-title">More than a chatbot. A knowledge engine.</div>
+  <div class="section-sub">Your subscribers don't just ask questions — they get your actual expertise, backed by the specific content you've created, delivered in your authentic voice.</div>
+
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feat-icon">💬</div>
+      <h3>AI Conversations in Your Voice</h3>
+      <p>Subscribers chat with an AI trained on your content. It responds the way you would — with your frameworks, your examples, your personality.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feat-icon">📊</div>
+      <h3>Content Intelligence Dashboard</h3>
+      <p>See which topics resonate, what's trending, where the gaps are. Understand your content strategy at a glance with real performance data.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feat-icon">🎯</div>
+      <h3>Recency-Aware Intelligence</h3>
+      <p>Your AI evolves with you. Recent content is weighted 5× more than older material, so it always reflects your current thinking and direction.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feat-icon">📎</div>
+      <h3>Source-Linked Answers</h3>
+      <p>Every answer cites the specific video and timestamp it came from. Your audience discovers (and rewatches) content they'd never find on their own.</p>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section class="section" id="pricing">
+  <div class="section-eyebrow">Pricing</div>
+  <div class="section-title">Simple pricing that grows with you</div>
+  <div class="section-sub">Start free. Upgrade when your audience is ready to subscribe.</div>
+
+  <div class="pricing-grid">
+    <div class="price-card">
+      <div class="price-name">Explorer</div>
+      <div class="price-amount">Free</div>
+      <div class="price-period">forever</div>
+      <ul>
+        <li>Analyze up to 25 videos</li>
+        <li>Content intelligence dashboard</li>
+        <li>Topic mapping & trends</li>
+        <li>Basic voice profile</li>
+      </ul>
+      <a href="#start" class="price-btn">Start Free</a>
+    </div>
+    <div class="price-card featured">
+      <div class="price-name">Creator</div>
+      <div class="price-amount">$29<span>/mo</span></div>
+      <div class="price-period">your investment</div>
+      <ul>
+        <li>Unlimited video analysis</li>
+        <li>Full AI chat for subscribers</li>
+        <li>Custom subdomain</li>
+        <li>Analytics & insights</li>
+        <li>Priority processing</li>
+      </ul>
+      <a href="#start" class="price-btn">Get Started</a>
+    </div>
+    <div class="price-card">
+      <div class="price-name">Agency</div>
+      <div class="price-amount">$199<span>/mo</span></div>
+      <div class="price-period">manage multiple creators</div>
+      <ul>
+        <li>Up to 20 creator profiles</li>
+        <li>White-label option</li>
+        <li>API access</li>
+        <li>Dedicated support</li>
+        <li>Custom integrations</li>
+      </ul>
+      <a href="#start" class="price-btn">Contact Us</a>
+    </div>
+  </div>
+</section>
+
+<!-- EXISTING CREATORS -->
+<section class="section" id="creators-section" style="display:none;text-align:center;">
+  <div class="section-eyebrow">Live Creators</div>
+  <div class="section-title">Already on the platform</div>
+  <div class="creators-grid" id="creators-grid"></div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="foot-logo">True<span>Influence</span>AI</div>
+  <div class="foot-text">Your content. Your voice. Your revenue. Amplified by AI.</div>
+  <div class="foot-links">
+    <a href="#how">How It Works</a>
+    <a href="#features">Features</a>
+    <a href="#pricing">Pricing</a>
+    <a href="mailto:steve@wintechpartners.com">Contact</a>
+  </div>
+</footer>
+
+<script>
+// ── Nav scroll effect ──
+window.addEventListener('scroll', () => {
+  document.getElementById('nav').classList.toggle('scrolled', window.scrollY > 40);
+});
+
+// ── Load existing creators ──
+async function loadCreators() {
+  try {
+    const resp = await fetch('/api/creators');
+    const data = await resp.json();
+    if (data.creators && data.creators.length > 0) {
+      const grid = document.getElementById('creators-grid');
+      document.getElementById('creators-section').style.display = '';
+      data.creators.forEach(c => {
+        const initial = c.name.charAt(0).toUpperCase();
+        const chip = document.createElement('a');
+        chip.className = 'creator-chip';
+        chip.href = '/c/' + c.handle;
+        chip.innerHTML = `
+          <div class="cc-avatar">${initial}</div>
+          <div>
+            <div class="cc-name">${c.name}</div>
+            <div class="cc-meta">${c.videos} videos • ${c.chunks} insights</div>
+          </div>
+        `;
+        grid.appendChild(chip);
+      });
+    }
+  } catch(e) {}
+}
+loadCreators();
+
+// ── Onboarding ──
+let currentJobId = null;
+let pollTimer = null;
+
+async function startOnboarding() {
+  const input = document.getElementById('channel-input');
+  const btn = document.getElementById('go-btn');
+  const url = input.value.trim();
+  if (!url) { input.focus(); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Starting...';
+  document.getElementById('job-status').classList.add('active');
+  document.getElementById('job-result').classList.remove('active');
+  document.getElementById('job-step').textContent = 'Submitting...';
+  document.getElementById('job-bar').style.width = '5%';
+
+  try {
+    const resp = await fetch('/api/onboard', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ channel_url: url, max_videos: 50 })
+    });
+    const data = await resp.json();
+    if (data.job_id) {
+      currentJobId = data.job_id;
+      pollTimer = setInterval(pollJob, 3000);
+    } else {
+      document.getElementById('job-step').textContent = 'Error: ' + (data.detail || 'Unknown error');
+      btn.disabled = false;
+      btn.textContent = 'Analyze →';
+    }
+  } catch(e) {
+    document.getElementById('job-step').textContent = 'Error: Could not reach server';
+    btn.disabled = false;
+    btn.textContent = 'Analyze →';
+  }
+}
+
+const stepProgress = {
+  'queued': 5,
+  'ingesting': 15,
+  'Scanning channel': 20,
+  'pulling transcripts': 30,
+  'Ingesting content': 40,
+  'Enriching': 55,
+  'Analyzing voice': 65,
+  'voice': 65,
+  'insights': 75,
+  'Analytics': 80,
+  'analytics': 80,
+  'Pages': 90,
+  'pages': 90,
+  'Ready': 100,
+  'complete': 100
+};
+
+function estimateProgress(step, status) {
+  if (status === 'complete') return 100;
+  for (const [key, val] of Object.entries(stepProgress)) {
+    if (step.toLowerCase().includes(key.toLowerCase())) return val;
+  }
+  return 10;
+}
+
+async function pollJob() {
+  if (!currentJobId) return;
+  try {
+    const resp = await fetch('/api/job/' + currentJobId);
+    const job = await resp.json();
+    
+    document.getElementById('job-step').textContent = job.step || job.status;
+    document.getElementById('job-bar').style.width = estimateProgress(job.step || '', job.status) + '%';
+    
+    if (job.status === 'complete') {
+      clearInterval(pollTimer);
+      document.getElementById('job-bar').style.width = '100%';
+      document.getElementById('job-step').textContent = '✓ Complete!';
+      
+      const resultDiv = document.getElementById('job-result');
+      const resultLink = document.getElementById('result-link');
+      resultLink.href = '/c/' + (job.handle || 'unknown');
+      resultDiv.classList.add('active');
+      
+      document.getElementById('go-btn').disabled = false;
+      document.getElementById('go-btn').textContent = 'Analyze →';
+      
+      // Refresh creators list
+      loadCreators();
+    } else if (job.status === 'failed') {
+      clearInterval(pollTimer);
+      document.getElementById('job-step').textContent = '✗ Failed: ' + (job.error || 'Unknown error');
+      document.getElementById('job-bar').style.width = '0%';
+      document.getElementById('go-btn').disabled = false;
+      document.getElementById('go-btn').textContent = 'Try Again →';
+    }
+  } catch(e) {}
+}
+
+// Enter key triggers submit
+document.getElementById('channel-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') startOnboarding();
+});
+</script>
+</body>
+</html>

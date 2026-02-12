@@ -1,0 +1,58 @@
+
+============================================================
+  🚀 ONBOARDING: Sunny Lenarduzzi
+  Last 12 months of YouTube content
+============================================================
+
+  📁 Creating collection...
+  ✅ Created: Sunny Lenarduzzi
+
+  📺 Starting channel scan: https://www.youtube.com/@SunnyLenarduzzi
+     Max videos: 100 (temporal weighting will handle recency)
+  ✅ Ingestion job started: c2a6a35e
+
+  ⏳ Ingesting videos (caption-first, this may take a few minutes)...
+
+
+  ✅ Ingestion complete in 12s
+     Videos: 0/0 | Errors: 0
+
+  📊 Collection stats...
+     Sources: 0
+     Chunks:  0
+     Hours:   0.0
+
+  🧠 Running temporal-weighted analysis...
+  ⏳ Waiting for analysis to complete...
+    ... waiting (10s)
+    ... waiting (20s)
+    ... waiting (30s)
+    ... waiting (40s)
+    ... waiting (50s)
+    ... waiting (60s)
+    ... waiting (70s)
+    ... waiting (80s)
+    ... waiting (90s)
+    ... waiting (100s)
+    ... waiting (110s)
+    ... waiting (120s)
+    ... waiting (130s)
+    ... waiting (140s)
+    ... waiting (150s)
+    ... waiting (160s)
+    ... waiting (170s)
+    ... waiting (180s)
+    ... waiting (190s)
+    ... waiting (200s)
+    ... waiting (210s)
+    ... waiting (220s)
+    ... waiting (230s)
+    ... waiting (240s)
+    ... waiting (250s)
+    ... waiting (260s)
+    ... waiting (270s)
+    ... waiting (280s)
+    ... waiting (290s)
+    ... waiting (300s)
+
+  ⚠️ Analysis timed out. Check API logs.

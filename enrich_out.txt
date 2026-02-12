@@ -1,0 +1,18 @@
+[KEY] YouTube API Key: AIzaSyDM...8STA
+[BUNDLE] Enriching: SunnyLenarduzzi_20260211_164612
+
+[STATS] Fetching stats for 50 videos...
+  [ERROR] API 403 Forbidden.
+  Your YouTube Data API v3 may not be enabled.
+  Go to: https://console.cloud.google.com/apis/library/youtube.googleapis.com
+  Response: {
+  "error": {
+    "code": 403,
+    "message": "Requests to this API youtube method youtube.api.v3.V3DataVideoService.List are blocked.",
+    "errors": [
+      {
+        "message": "Requests to this API youtube method youtube.api.v3.V3DataVideoService.List are blocked.",
+        "domain": "global",
+
+
+[FAIL] Enrichment failed. Check API key status.

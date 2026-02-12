@@ -1,0 +1,8 @@
+[*] Building pages for: SunnyLenarduzzi_20260211_164612
+  [OK] index.html
+  [OK] analytics.html
+    571 chunks x 4096-dim embeddings
+  [OK] discuss.html
+
+[OK] All pages saved to C:\Users\steve\Documents\TrueInfluenceAI\bundles\SunnyLenarduzzi_20260211_164612
+     Open: C:\Users\steve\Documents\TrueInfluenceAI\bundles\SunnyLenarduzzi_20260211_164612\index.html
