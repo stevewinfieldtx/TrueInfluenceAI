@@ -28,7 +28,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from dotenv import load_dotenv
 
-load_dotenv()
+# Load .env from project root (one level up), fall back to current dir
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+load_dotenv()  # also check current dir as fallback (e.g. Railway)
 
 # ---------------------------------------------------------------------------
 # Config
@@ -42,8 +44,10 @@ PORT = int(os.getenv("PORT", 8080))
 # App
 # ---------------------------------------------------------------------------
 app = FastAPI(title="TrueInfluenceAI", version="1.0.0")
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
+STATIC_DIR = Path(__file__).resolve().parent / "static"
+STATIC_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent / "templates"))
 
 # In-memory job tracker (swap for Redis/DB in production)
 jobs = {}
