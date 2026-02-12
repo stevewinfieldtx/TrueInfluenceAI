@@ -103,7 +103,7 @@ def get_transcript_ytdlp(video_id):
         ]
         try:
             subprocess.run(cmd, capture_output=True, timeout=30, check=False)
-        except subprocess.TimeoutExpired:
+        except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
             return None
 
         # Find the subtitle file
