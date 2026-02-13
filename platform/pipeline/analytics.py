@@ -116,6 +116,8 @@ Example: ["Countries to avoid retiring in", "Vietnam visa run elimination", "$15
             topics = json.loads(text_resp.strip())
             if isinstance(topics, list):
                 topic_map[vid] = [t.strip() for t in topics if isinstance(t, str)]
+        except json.JSONDecodeError as e:
+            print(f"   Topic extraction JSON parse failed for {vid}: {e} (response: {text_resp[:100] if text_resp else 'empty'})")
         except Exception as e:
             print(f"   Topic extraction failed for {vid}: {e}")
 

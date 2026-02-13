@@ -210,11 +210,17 @@ class StatisticalAnalyzer:
         weights = []
         for date in dates:
             if isinstance(date, str):
-                # Parse common date formats
+                # Parse ISO 8601 dates (YouTube uses 2025-01-15T01:00:00Z)
                 try:
-                    date = datetime.strptime(date, '%Y-%m-%d')
-                except:
-                    date = datetime.strptime(date, '%Y-%m-%dT%H:%M:%S')
+                    date = datetime.fromisoformat(date.replace('Z', '+00:00')).replace(tzinfo=None)
+                except (ValueError, AttributeError):
+                    try:
+                        date = datetime.strptime(date, '%Y-%m-%dT%H:%M:%SZ')
+                    except ValueError:
+                        try:
+                            date = datetime.strptime(date, '%Y-%m-%d')
+                        except ValueError:
+                            date = now  # Fallback: treat unparseable as recent
             
             age_months = (now - date).days / 30.44
             weight = math.exp(-self.RECENCY_DECAY_RATE * age_months)
@@ -326,9 +332,12 @@ class StatisticalAnalyzer:
         for d in dates:
             if isinstance(d, str):
                 try:
-                    d = datetime.strptime(d, '%Y-%m-%d')
-                except:
-                    d = datetime.strptime(d, '%Y-%m-%dT%H:%M:%S')
+                    d = datetime.fromisoformat(d.replace('Z', '+00:00')).replace(tzinfo=None)
+                except (ValueError, AttributeError):
+                    try:
+                        d = datetime.strptime(d, '%Y-%m-%d')
+                    except ValueError:
+                        d = datetime.now()
             date_objs.append(d)
         
         min_date = min(date_objs)
@@ -566,9 +575,12 @@ class TopicCategorizer:
         oldest = min(dates)
         if isinstance(oldest, str):
             try:
-                oldest = datetime.strptime(oldest, '%Y-%m-%d')
-            except:
-                oldest = datetime.strptime(oldest, '%Y-%m-%dT%H:%M:%S')
+                oldest = datetime.fromisoformat(oldest.replace('Z', '+00:00')).replace(tzinfo=None)
+            except (ValueError, AttributeError):
+                try:
+                    oldest = datetime.strptime(oldest, '%Y-%m-%d')
+                except ValueError:
+                    oldest = datetime.now()
         
         age_months = (now - oldest).days / 30.44
         
