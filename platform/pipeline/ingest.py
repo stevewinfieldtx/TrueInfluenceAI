@@ -22,15 +22,18 @@ import scrapetube
 
 try:
     from youtube_transcript_api import YouTubeTranscriptApi
+    from youtube_transcript_api.proxies import WebshareProxyConfig
     HAS_YT_TRANSCRIPT_API = True
     print("   youtube-transcript-api: loaded OK")
 except ImportError:
     HAS_YT_TRANSCRIPT_API = False
+    WebshareProxyConfig = None
     print("   youtube-transcript-api: NOT INSTALLED - fallback disabled")
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "qwen/qwen3-embedding-8b")
-PROXY_URL = os.getenv("PROXY_URL", "")
+WEBSHARE_PROXY_USERNAME = os.getenv("WEBSHARE_PROXY_USERNAME", "")
+WEBSHARE_PROXY_PASSWORD = os.getenv("WEBSHARE_PROXY_PASSWORD", "")
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 50
 
@@ -146,7 +149,16 @@ def get_transcript_api(video_id):
         print(f"      [API fallback] skipped - youtube-transcript-api not installed")
         return None
     try:
-        ytt = YouTubeTranscriptApi(proxy_url=PROXY_URL) if PROXY_URL else YouTubeTranscriptApi()
+        if WEBSHARE_PROXY_USERNAME and WebshareProxyConfig:
+            ytt = YouTubeTranscriptApi(
+                proxy_config=WebshareProxyConfig(
+                    proxy_username=WEBSHARE_PROXY_USERNAME,
+                    proxy_password=WEBSHARE_PROXY_PASSWORD,
+                )
+            )
+            print(f"      [API fallback] using Webshare proxy")
+        else:
+            ytt = YouTubeTranscriptApi()
         langs = ["en", "pt", "pt-BR", "es", "fr", "de", "it", "ja", "ko", "zh-Hans", "hi"]
 
         # Try fetching with our preferred languages first
