@@ -460,6 +460,33 @@ function renderFutureIdeas() {{
   `;
 }}
 
+function renderFutureIdeas() {{
+  const el = document.getElementById('futureIdeas');
+  if (!FUTURE || !FUTURE.length) {{
+    el.innerHTML = '';
+    return;
+  }}
+
+  const cards = FUTURE.map(s => `
+    <div class="future-card">
+      <div class="fc-top">
+        <div class="fc-topic">${{s.topic}}</div>
+        <div class="fc-score">Score ${{(s.opportunity_score || 0).toFixed(1)}}</div>
+      </div>
+      <div class="fc-meta">${{(s.category || 'education')}} · ${{(s.trend || 'steady')}} · ${{(s.avg_engagement_rate || 0).toFixed(2)}}% engagement</div>
+      <div class="fc-idea">${{(s.idea_angles && s.idea_angles[0]) || 'Create a fresh angle based on this topic\'s recent audience response.'}}</div>
+    </div>
+  `).join('');
+
+  el.innerHTML = `
+    <div class="future-wrap">
+      <h3>🚀 Recommended Future Content</h3>
+      <p class="sub" style="margin:0;color:var(--muted)">Ranked using historical topic performance + follower engagement signals.</p>
+      <div class="future-grid">${{cards}}</div>
+    </div>
+  `;
+}}
+
 function sectionHTML(icon, title, color, items, subtitle) {{
   let cards = '';
   items.forEach((item, i) => {{
