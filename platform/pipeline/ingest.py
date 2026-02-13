@@ -23,8 +23,10 @@ import scrapetube
 try:
     from youtube_transcript_api import YouTubeTranscriptApi
     HAS_YT_TRANSCRIPT_API = True
+    print("   youtube-transcript-api: loaded OK")
 except ImportError:
     HAS_YT_TRANSCRIPT_API = False
+    print("   youtube-transcript-api: NOT INSTALLED - fallback disabled")
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "qwen/qwen3-embedding-8b")
