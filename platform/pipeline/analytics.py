@@ -145,18 +145,27 @@ def _cluster_topics(topic_map):
     
     topics_list = sorted(all_topics)
     
-    prompt = f"""I have {len(topics_list)} content topics extracted from a YouTube channel's videos.
-Many of these are variations of the same theme. Group them into 8-15 CONTENT PILLARS.
+    # Target pillar count based on number of videos
+    num_videos = len(topic_map)
+    target_pillars = max(6, min(12, num_videos // 2))
+    
+    prompt = f"""I have {len(topics_list)} content topics extracted from {num_videos} YouTube videos.
+Group them into EXACTLY {target_pillars} content pillars. NO MORE than {target_pillars}.
 
 TOPICS:
 {chr(10).join(f'- {t}' for t in topics_list)}
 
 RULES:
-- Each pillar should be 2-4 words (short, punchy labels)
-- Every single topic MUST be assigned to exactly one pillar
-- Pillars should represent what the AUDIENCE searches for
-- Good pillars: "Cost of Living", "Vietnam Visas", "Da Nang Guide", "Retirement Planning", "Healthcare Abroad"
-- Bad pillars: "Miscellaneous", "Other Topics", "General" (too vague to be useful)
+- EXACTLY {target_pillars} pillars. Merge aggressively. Fewer is better.
+- Each pillar should be 2-4 words
+- MERGE similar topics ruthlessly:
+  - "Da Nang affordability" + "Da Nang vs Ho Chi Minh" + "Reasons for leaving Da Nang" = ONE pillar: "Da Nang Living"
+  - "Vietnam rent tiers" + "Real rent costs" + "Cost of living breakdown" + "Escaping cost of living crisis" = ONE pillar: "Cost of Living"
+  - "Retirement visa challenges" + "Visa options for retirees" + "Long-term visa pathways" = ONE pillar: "Visas & Immigration"
+  - "Expat loneliness" + "Expat relationships" + "Culture shock" + "Adapting to local life" = ONE pillar: "Expat Adjustment"
+- Every topic MUST be assigned to exactly one pillar
+- Each pillar should ideally contain topics from MULTIPLE different videos
+- If two topics sound even vaguely related, they go in the SAME pillar
 
 Respond in this exact JSON format:
 {{
@@ -166,7 +175,7 @@ Respond in this exact JSON format:
   }}
 }}
 
-Return ONLY valid JSON. Every topic from the list above must appear exactly once."""
+Return ONLY valid JSON. Every topic must appear exactly once. EXACTLY {target_pillars} pillars."""
 
     try:
         resp = requests.post(
