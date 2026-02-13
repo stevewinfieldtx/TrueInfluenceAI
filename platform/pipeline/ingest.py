@@ -142,6 +142,7 @@ def get_transcript_ytdlp(video_id):
 def get_transcript_api(video_id):
     """Fallback: pull captions via youtube-transcript-api v1.2+. Tries ALL available languages."""
     if not HAS_YT_TRANSCRIPT_API:
+        print(f"      [API fallback] skipped - youtube-transcript-api not installed")
         return None
     try:
         ytt = YouTubeTranscriptApi()
@@ -151,20 +152,23 @@ def get_transcript_api(video_id):
         fetched = None
         try:
             fetched = ytt.fetch(video_id, languages=langs)
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"      [API fallback] preferred langs failed: {e}")
 
         # If that failed, list what's actually available and use those
         if not fetched:
             try:
                 transcript_list = ytt.list(video_id)
                 available = [t.language_code for t in transcript_list]
+                print(f"      [API fallback] available langs: {available}")
                 if available:
                     fetched = ytt.fetch(video_id, languages=available)
-            except Exception:
+            except Exception as e:
+                print(f"      [API fallback] list/fetch failed: {e}")
                 return None
 
         if not fetched:
+            print(f"      [API fallback] no transcripts found")
             return None
 
         segments = []
@@ -174,8 +178,10 @@ def get_transcript_api(video_id):
             if text:
                 segments.append({"text": text, "start": start})
 
+        print(f"      [API fallback] got {len(segments)} segments")
         return {"video_id": video_id, "segments": segments} if segments else None
-    except Exception:
+    except Exception as e:
+        print(f"      [API fallback] unexpected error: {e}")
         return None
 
 
@@ -184,6 +190,7 @@ def get_transcript(video_id):
     result = get_transcript_ytdlp(video_id)
     if result:
         return result
+    print(f"      yt-dlp returned nothing for {video_id}, trying API fallback...")
     return get_transcript_api(video_id)
 
 
