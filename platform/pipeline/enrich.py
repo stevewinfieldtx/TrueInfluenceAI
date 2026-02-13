@@ -104,9 +104,14 @@ def enrich_bundle(bundle_dir):
 def _build_metrics_from_scraped(bundle_dir, sources):
     """Build basic metrics from scraped data when no API key available."""
     views = [s.get("views", 0) for s in sources if s.get("views", 0) > 0]
+    stats = _compute_view_statistics(views)
     metrics = {
         "total_views": sum(views),
-        "channel_avg_views": int(sum(views) / len(views)) if views else 0,
+        "channel_avg_views": int(stats["mean"]) if views else 0,
+        "channel_std_views": round(stats["std_dev"], 1),
+        "channel_median_views": int(stats["median"]),
+        "channel_q1_views": int(stats["q1"]),
+        "channel_q3_views": int(stats["q3"]),
         "total_videos": len(sources),
         "channel_engagement_rate": 0,
         "enriched_with_api": False,
@@ -114,6 +119,22 @@ def _build_metrics_from_scraped(bundle_dir, sources):
     (bundle_dir / "channel_metrics.json").write_text(
         json.dumps(metrics, indent=2), encoding="utf-8"
     )
+
+
+def _compute_view_statistics(views):
+    """Compute statistical summary of view counts."""
+    import statistics as stats_lib
+    if not views:
+        return {"mean": 0, "median": 0, "std_dev": 0, "q1": 0, "q3": 0}
+    sorted_v = sorted(views)
+    n = len(sorted_v)
+    return {
+        "mean": stats_lib.mean(views),
+        "median": stats_lib.median(views),
+        "std_dev": stats_lib.stdev(views) if n > 1 else 0,
+        "q1": sorted_v[n // 4],
+        "q3": sorted_v[(3 * n) // 4],
+    }
 
 
 def _build_channel_metrics(bundle_dir, sources, stats_map):
@@ -130,11 +151,17 @@ def _build_channel_metrics(bundle_dir, sources, stats_map):
     if total_views > 0:
         engagement = round((total_likes + total_comments) / total_views * 100, 2)
 
+    view_stats = _compute_view_statistics(views)
+
     metrics = {
         "total_views": total_views,
         "total_likes": total_likes,
         "total_comments": total_comments,
-        "channel_avg_views": int(total_views / len(views)) if views else 0,
+        "channel_avg_views": int(view_stats["mean"]) if views else 0,
+        "channel_std_views": round(view_stats["std_dev"], 1),
+        "channel_median_views": int(view_stats["median"]),
+        "channel_q1_views": int(view_stats["q1"]),
+        "channel_q3_views": int(view_stats["q3"]),
         "channel_avg_likes": int(total_likes / len(likes)) if likes else 0,
         "channel_engagement_rate": engagement,
         "total_videos": len(sources),

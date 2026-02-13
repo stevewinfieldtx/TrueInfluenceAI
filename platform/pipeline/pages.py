@@ -78,38 +78,46 @@ def _load_bundle(bp):
     return data
 
 
-# ─── Categorize Topics into 4 Buckets ──────────────────────────
+# ─── Categorize Topics (Improved Statistics) ───────────────────
 def _categorize_topics(data):
-    """Analyze topics and sort into: double_down, untapped, resurface, stop_making."""
+    """Analyze topics using statistically grounded methods.
+    
+    Drop-in replacement using improved_statistics module for:
+    - Z-score based classification
+    - Confidence intervals
+    - Coefficient of Variation for consistency
+    - Bayesian smoothing for small samples
+    - IQR outlier detection
+    """
+    try:
+        from pipeline.improved_statistics import improved_categorize_topics
+        return improved_categorize_topics(data)
+    except ImportError:
+        try:
+            from improved_statistics import improved_categorize_topics
+            return improved_categorize_topics(data)
+        except ImportError:
+            print("WARNING: improved_statistics not found, using basic categorization")
+            return _categorize_topics_basic(data)
+
+
+def _categorize_topics_basic(data):
+    """Basic fallback categorization if improved_statistics is not available."""
     analytics = data.get("analytics_report", {})
     performance = analytics.get("topic_performance", {})
     timeline = analytics.get("topic_timeline", {})
-    topic_map = analytics.get("topic_map", {})
     sources = data.get("sources", [])
-    metrics = data.get("channel_metrics", {})
-    channel_avg = metrics.get("channel_avg_views", 1)
-
     source_map = {s["source_id"]: s for s in sources}
 
-    double_down = []   # High performing, room to grow
-    untapped = []      # One video, way above average
-    resurface = []     # Old hits worth updating
-    stop_making = []   # Consistently underperforms
-
-    seen_topics = set()
+    double_down, untapped, resurface, stop_making = [], [], [], []
 
     for topic, perf in sorted(performance.items(), key=lambda x: -x[1].get("weighted_avg_views", 0)):
-        if topic in seen_topics:
-            continue
-        seen_topics.add(topic)
-
         vs = perf.get("vs_channel_avg", 0)
         count = perf.get("video_count", 0)
         avg_views = perf.get("weighted_avg_views", 0)
         tl = timeline.get(topic, {})
         videos = tl.get("videos", [])
 
-        # Find the actual video data for this topic
         video_details = []
         for v in videos:
             vid = v.get("video_id", "")
@@ -122,53 +130,26 @@ def _categorize_topics(data):
                 "url": s.get("url", f"https://www.youtube.com/watch?v={vid}"),
             })
 
-        entry = {
-            "topic": topic,
-            "vs_channel": vs,
-            "avg_views": avg_views,
-            "video_count": count,
-            "videos": video_details,
-        }
+        entry = {"topic": topic, "vs_channel": vs, "avg_views": avg_views,
+                 "video_count": count, "videos": video_details}
 
-        # Resurface: old content that crushed it (>50% above avg, oldest video >6 months)
-        if vs > 50 and count <= 3 and video_details:
-            pub = video_details[0].get("published", "")
-            if any(kw in pub.lower() for kw in ["year", "month", "years", "months"]):
-                # Parse rough age
-                is_old = False
-                for kw in ["1 year", "2 year", "years", "8 month", "9 month", "10 month", "11 month"]:
-                    if kw in pub.lower():
-                        is_old = True
-                        break
-                if is_old:
-                    entry["reason"] = f"Got {avg_views:,.0f} views ({vs:+.0f}% vs avg) but hasn't been updated. Time for a 2026 refresh."
-                    resurface.append(entry)
-                    continue
-
-        # Untapped: 1 video, way above average (>100%)
         if count == 1 and vs > 100:
-            entry["reason"] = f"One video got {avg_views:,.0f} views — {vs:+.0f}% above your average. Your audience is hungry for more."
+            entry["reason"] = f"One video got {avg_views:,.0f} views — {vs:+.0f}% above average."
             untapped.append(entry)
-            continue
-
-        # Double Down: multiple videos, consistently above average
-        if count >= 2 and vs > 20:
-            entry["reason"] = f"{count} videos averaging {avg_views:,.0f} views ({vs:+.0f}% above avg). This is your lane — keep going."
+        elif count >= 2 and vs > 20:
+            entry["reason"] = f"{count} videos averaging {avg_views:,.0f} views ({vs:+.0f}% above avg)."
             double_down.append(entry)
-            continue
-
-        # Stop Making: consistently below average
-        if vs < -40 and count >= 1:
-            entry["reason"] = f"{avg_views:,.0f} avg views — {abs(vs):.0f}% below your channel average. Your audience isn't here for this."
+        elif vs < -40:
+            entry["reason"] = f"{avg_views:,.0f} avg views — {abs(vs):.0f}% below average."
             stop_making.append(entry)
-            continue
 
     return {
-        "double_down": double_down[:6],
-        "untapped": untapped[:6],
-        "resurface": resurface[:6],
-        "stop_making": stop_making[:6],
+        "double_down": double_down[:6], "untapped": untapped[:6],
+        "resurface": resurface[:6], "stop_making": stop_making[:6],
+        "investigate": [],
     }
+
+
 
 
 # ─── Build All Pages ───────────────────────────────────────────
@@ -375,6 +356,11 @@ function renderDashboard() {{
     html += sectionHTML('🚫', 'Consider Dropping', 'var(--red)', CATS.stop_making.slice(0, 4), 'Consistently below average. Your audience isn\\'t here for this.');
   }}
 
+  // Investigate (new: mixed signals)
+  if (CATS.investigate && CATS.investigate.length) {{
+    html += sectionHTML('🔍', 'Needs Investigation', 'var(--muted)', CATS.investigate.slice(0, 4), 'Mixed signals — one video crushed it, another flopped. Dig into what made the winner work.');
+  }}
+
   el.innerHTML = html;
 }}
 
@@ -383,6 +369,13 @@ function sectionHTML(icon, title, color, items, subtitle) {{
   items.forEach((item, i) => {{
     const vsColor = item.vs_channel > 0 ? 'var(--green)' : 'var(--red)';
     const sign = item.vs_channel > 0 ? '+' : '';
+    const confBadge = item.confidence_level === 'high'
+      ? '<span style="background:var(--green-soft);color:var(--green);padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600">High confidence</span>'
+      : item.confidence_level === 'medium'
+      ? '<span style="background:var(--gold-soft);color:var(--gold);padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600">Medium confidence</span>'
+      : item.confidence_level
+      ? '<span style="background:var(--red-soft);color:var(--red);padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600">Low confidence</span>'
+      : '';
     cards += `
       <div class="topic-card" onclick="openDetail('${{title}}', ${{i}})">
         <div class="tc-head">
@@ -390,7 +383,7 @@ function sectionHTML(icon, title, color, items, subtitle) {{
           <span class="tc-stat" style="background:${{item.vs_channel > 0 ? 'var(--green-soft)' : 'var(--red-soft)'}};color:${{vsColor}}">${{sign}}${{item.vs_channel.toFixed(0)}}%</span>
         </div>
         <div class="tc-reason">${{item.reason}}</div>
-        <div class="tc-vids">${{item.video_count}} video${{item.video_count !== 1 ? 's' : ''}} · ${{item.avg_views.toLocaleString()}} avg views</div>
+        <div class="tc-vids">${{item.video_count}} video${{item.video_count !== 1 ? 's' : ''}} · ${{item.avg_views.toLocaleString()}} avg views ${{confBadge}}</div>
         <div class="tc-expand">Click to explore →</div>
       </div>`;
   }});
@@ -410,6 +403,7 @@ function openDetail(section, index) {{
   if (section.includes('Double')) items = CATS.double_down;
   else if (section.includes('Untapped')) items = CATS.untapped;
   else if (section.includes('Resurface')) items = CATS.resurface;
+  else if (section.includes('Investigation') || section.includes('Investigate')) items = CATS.investigate;
   else items = CATS.stop_making;
 
   const item = items[index];
@@ -435,6 +429,25 @@ function openDetail(section, index) {{
       <span style="color:var(--muted)"> vs your channel average · ${{item.video_count}} video${{item.video_count !== 1 ? 's' : ''}} · ${{item.avg_views.toLocaleString()}} avg views</span>
     </div>
     <div class="dp-reason">${{item.reason}}</div>
+    ${{item.z_score !== undefined ? `
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
+      <div style="background:var(--surface2);padding:12px;border-radius:8px;text-align:center">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Z-Score</div>
+        <div style="font-size:18px;font-weight:700;color:${{item.z_score > 1 ? 'var(--green)' : item.z_score < -0.5 ? 'var(--red)' : 'var(--bright)'}}">${{item.z_score.toFixed(1)}}</div>
+      </div>
+      <div style="background:var(--surface2);padding:12px;border-radius:8px;text-align:center">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Consistency</div>
+        <div style="font-size:18px;font-weight:700;color:${{(item.consistency_cv || 0) < 50 ? 'var(--green)' : (item.consistency_cv || 0) > 100 ? 'var(--red)' : 'var(--gold)'}}">${{(item.consistency_cv || 0).toFixed(0)}}%</div>
+      </div>
+      <div style="background:var(--surface2);padding:12px;border-radius:8px;text-align:center">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Confidence</div>
+        <div style="font-size:14px;font-weight:600;color:${{item.confidence_level === 'high' ? 'var(--green)' : item.confidence_level === 'medium' ? 'var(--gold)' : 'var(--red)'}}">${{(item.confidence_level || 'unknown').toUpperCase()}}</div>
+      </div>
+      <div style="background:var(--surface2);padding:12px;border-radius:8px;text-align:center">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Trend</div>
+        <div style="font-size:14px;font-weight:600;color:${{item.trend_direction === 'rising' ? 'var(--green)' : item.trend_direction === 'declining' ? 'var(--red)' : 'var(--muted)'}}">${{(item.trend_direction || 'unknown').toUpperCase()}}</div>
+      </div>
+    </div>` : ''}}
     ${{videoRows ? '<div class="dp-videos"><h4>Videos</h4>' + videoRows + '</div>' : ''}}
     <div class="action-btns">
       <div class="action-btn" onclick="showStats('${{item.topic}}')">

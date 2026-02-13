@@ -76,14 +76,22 @@ def _extract_topics(sources, chunks):
         if not text:
             continue
 
-        prompt = f"""Extract 3-5 content topics from this video transcript.
+        prompt = f"""Extract 3-5 SPECIFIC content topics from this video transcript.
 Video title: "{s.get('title', '')}"
 
 Transcript excerpt:
 {text}
 
-Return ONLY a JSON array of topic strings. Each topic should be 2-4 words.
-Example: ["YouTube Growth Strategy", "Email Marketing", "Course Creation"]"""
+RULES:
+- Each topic must be SPECIFIC to what was actually discussed, not a broad category
+- BAD: "Safety concerns", "Cost of living", "Expat life" (too vague)
+- GOOD: "Vietnam scam tactics", "Da Nang monthly budget breakdown", "Expat loneliness in Southeast Asia" (specific)
+- Topics should describe the ANGLE or ARGUMENT, not just the subject area
+- If the video warns about something, the topic should reflect that (e.g. "Countries to avoid in Asia" not "Safety concerns")
+- Each topic should be 3-6 words
+
+Return ONLY a JSON array of topic strings.
+Example: ["Countries to avoid retiring in", "Vietnam visa run elimination", "$1500/month retirement budget"]"""
 
         try:
             resp = requests.post(
@@ -147,7 +155,7 @@ def _analyze_performance(topic_map, sources, metrics):
     position_map = {s["source_id"]: i for i, s in enumerate(sorted_sources)}
     total = max(len(sorted_sources), 1)
 
-    topic_stats = defaultdict(lambda: {"weighted_views": 0, "total_weight": 0, "videos": 0})
+    topic_stats = defaultdict(lambda: {"weighted_views": 0, "total_weight": 0, "videos": 0, "raw_views": []})
 
     for vid, topics in topic_map.items():
         s = source_map.get(vid, {})
@@ -168,14 +176,28 @@ def _analyze_performance(topic_map, sources, metrics):
             topic_stats[t]["weighted_views"] += views * w
             topic_stats[t]["total_weight"] += w
             topic_stats[t]["videos"] += 1
+            topic_stats[t]["raw_views"].append(views)
 
     performance = {}
     for topic, stats in topic_stats.items():
         avg = stats["weighted_views"] / stats["total_weight"] if stats["total_weight"] else 0
+        raw = stats["raw_views"]
+        max_v = max(raw) if raw else 0
+        min_v = min(raw) if raw else 0
+        # Consistency check: if max is >5x min across 2+ videos, flag as inconsistent
+        is_consistent = True
+        if len(raw) >= 2 and min_v > 0:
+            is_consistent = (max_v / min_v) < 5
+        elif len(raw) >= 2 and min_v == 0:
+            is_consistent = False
+
         performance[topic] = {
             "weighted_avg_views": round(avg),
             "video_count": stats["videos"],
             "vs_channel_avg": round((avg / channel_avg - 1) * 100, 1) if channel_avg else 0,
+            "is_consistent": is_consistent,
+            "max_views": max_v,
+            "min_views": min_v,
         }
 
     return performance
