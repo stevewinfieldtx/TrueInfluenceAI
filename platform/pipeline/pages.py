@@ -240,12 +240,15 @@ def _build_dashboard(bp, data):
     slug = data["slug"]
     cats = data.get("categories", {})
     insights_data = data.get("insights", {})
+    analytics_data = data.get("analytics_report", {})
     direction = insights_data.get("strategic_direction", "")
     voice = data.get("voice_profile", {})
+    future_suggestions = analytics_data.get("future_content_suggestions", [])
 
     # Encode data for JavaScript
     cats_json = json.dumps(cats, ensure_ascii=False)
     voice_json = json.dumps(voice, ensure_ascii=False)
+    future_json = json.dumps(future_suggestions[:8], ensure_ascii=False)
 
     html = f"""<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>{ch} Dashboard · TrueInfluenceAI</title>{FONTS}
@@ -309,6 +312,15 @@ def _build_dashboard(bp, data):
 
 /* Empty state */
 .empty{{color:var(--muted);font-size:14px;font-style:italic;padding:16px 0}}
+.future-wrap{{margin:18px 0 6px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px}}
+.future-wrap h3{{margin:0 0 6px;font-size:16px}}
+.future-grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;margin-top:12px}}
+.future-card{{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px}}
+.future-card .fc-top{{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}}
+.future-card .fc-topic{{font-size:13px;color:var(--bright);font-weight:600}}
+.future-card .fc-score{{font-size:11px;color:var(--accent-glow);font-weight:700}}
+.future-card .fc-meta{{font-size:11px;color:var(--muted);margin-bottom:6px}}
+.future-card .fc-idea{{font-size:12px;color:var(--text);line-height:1.4}}
 </style></head><body>
 {_nav_html(ch, slug, 'dashboard')}
 <div class="container">
@@ -316,6 +328,8 @@ def _build_dashboard(bp, data):
 <p class="sub">What to make next — based on what's actually working</p>
 
 {'<div class="dir-box">'+direction+'</div>' if direction else ''}
+
+<div id="futureIdeas"></div>
 
 <div id="dashboard-content"></div>
 </div>
@@ -328,6 +342,7 @@ def _build_dashboard(bp, data):
 <script>
 const CATS = {cats_json};
 const VOICE = {voice_json};
+const FUTURE = {future_json};
 const API_KEY = '{OPENROUTER_API_KEY}';
 const MODEL = '{OPENROUTER_MODEL_ID}';
 const CHANNEL = '{ch}';
@@ -362,6 +377,33 @@ function renderDashboard() {{
   }}
 
   el.innerHTML = html;
+}}
+
+function renderFutureIdeas() {{
+  const el = document.getElementById('futureIdeas');
+  if (!FUTURE || !FUTURE.length) {{
+    el.innerHTML = '';
+    return;
+  }}
+
+  const cards = FUTURE.map(s => `
+    <div class="future-card">
+      <div class="fc-top">
+        <div class="fc-topic">${{s.topic}}</div>
+        <div class="fc-score">Score ${{(s.opportunity_score || 0).toFixed(1)}}</div>
+      </div>
+      <div class="fc-meta">${{(s.category || 'education')}} · ${{(s.trend || 'steady')}} · ${{(s.avg_engagement_rate || 0).toFixed(2)}}% engagement</div>
+      <div class="fc-idea">${{(s.idea_angles && s.idea_angles[0]) || 'Create a fresh angle based on this topic\'s recent audience response.'}}</div>
+    </div>
+  `).join('');
+
+  el.innerHTML = `
+    <div class="future-wrap">
+      <h3>🚀 Recommended Future Content</h3>
+      <p class="sub" style="margin:0;color:var(--muted)">Ranked using historical topic performance + follower engagement signals.</p>
+      <div class="future-grid">${{cards}}</div>
+    </div>
+  `;
 }}
 
 function sectionHTML(icon, title, color, items, subtitle) {{
@@ -591,6 +633,7 @@ Return ONLY valid JSON.`;
 }}
 
 // Init
+renderFutureIdeas();
 renderDashboard();
 </script></body></html>"""
     (bp / "dashboard.html").write_text(html, encoding="utf-8")
@@ -603,6 +646,8 @@ def _build_analytics(bp, data):
     analytics = data.get("analytics_report", {})
     timeline = analytics.get("topic_timeline", {})
     performance = analytics.get("topic_performance", {})
+    content_categories = analytics.get("content_categories", {})
+    future_suggestions = analytics.get("future_content_suggestions", [])
     sources = data.get("sources", [])
     source_map = {s["source_id"]: s for s in sources}
     all_topics = set(timeline.keys()) | set(performance.keys())
@@ -640,6 +685,27 @@ def _build_analytics(bp, data):
 
         rows += f'<tr data-trend="{tr}"><td style="color:var(--bright);font-weight:500">{topic}</td><td>{count}</td><td>{avg:,}</td><td style="color:{vc};font-weight:600">{sign}{vs}%</td><td><span style="color:{tc};font-size:12px">{ti}</span></td></tr>'
 
+    category_rows = ""
+    for topic, meta in sorted(content_categories.items(), key=lambda kv: -kv[1].get("weighted_avg_views", 0))[:20]:
+        category_rows += (
+            f'<tr><td style="color:var(--bright);font-weight:500">{topic}</td>'
+            f'<td>{meta.get("category", "education")}</td>'
+            f'<td>{meta.get("video_count", 0)}</td>'
+            f'<td>{meta.get("weighted_avg_views", 0):,}</td>'
+            f'<td style="color:{"var(--green)" if meta.get("momentum_flag") == "hot" else "var(--muted)"}">{meta.get("momentum_flag", "stable")}</td></tr>'
+        )
+
+    suggestion_rows = ""
+    for s in future_suggestions[:10]:
+        suggestion_rows += (
+            f'<tr><td style="color:var(--bright);font-weight:500">{s.get("topic", "")}</td>'
+            f'<td>{s.get("category", "education")}</td>'
+            f'<td>{s.get("trend", "steady")}</td>'
+            f'<td>{s.get("avg_engagement_rate", 0):.2f}%</td>'
+            f'<td>{s.get("opportunity_score", 0):.1f}</td>'
+            f'<td style="max-width:280px">{(s.get("idea_angles") or [""])[0]}</td></tr>'
+        )
+
     html = f"""<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>{ch} Analytics · TrueInfluenceAI</title>{FONTS}
 <style>{THEME_CSS}{NAV_CSS}
@@ -664,10 +730,20 @@ tr:hover{{background:rgba(99,102,241,.03)}}
 <button class="fb" onclick="ft('steady',this)">→ Steady</button>
 </div>
 <table><thead><tr><th>Topic</th><th>Videos</th><th>Wtd Avg Views</th><th>vs Channel Avg</th><th>Trend</th></tr></thead>
-<tbody>{rows}</tbody></table></div>
+<tbody>{rows}</tbody></table>
+
+<h3 style="margin-top:28px">Topic Categories</h3>
+<p class="sub" style="margin-bottom:10px">Topics grouped by intent so strategy is easier to execute.</p>
+<table><thead><tr><th>Topic</th><th>Category</th><th>Videos</th><th>Wtd Avg Views</th><th>Momentum</th></tr></thead>
+<tbody>{category_rows or '<tr><td colspan="5" style="color:var(--muted)">No category data yet.</td></tr>'}</tbody></table>
+
+<h3 style="margin-top:28px">Future Content Suggestions</h3>
+<p class="sub" style="margin-bottom:10px">Prioritized by historical performance + follower engagement.</p>
+<table><thead><tr><th>Topic</th><th>Category</th><th>Trend</th><th>Engagement</th><th>Score</th><th>Suggested Angle</th></tr></thead>
+<tbody>{suggestion_rows or '<tr><td colspan="6" style="color:var(--muted)">No future suggestions available yet.</td></tr>'}</tbody></table>
+</div>
 <script>
-function ft(t,el){{document.querySelectorAll('.fb').forEach(b=>b.classList.remove('active'));el.classList.add('active');
-document.querySelectorAll('tbody tr').forEach(r=>{{r.style.display=t==='all'||r.dataset.trend===t?'':'none'}})}}
+function ft(t,el){{document.querySelectorAll('.fb').forEach(b=>b.classList.remove('active'));el.classList.add('active');document.querySelectorAll('tbody tr').forEach(r=>{{r.style.display=(t==='all'||r.dataset.trend===t)?'':'none';}});}}
 </script></body></html>"""
     (bp / "analytics.html").write_text(html, encoding="utf-8")
 
