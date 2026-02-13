@@ -81,6 +81,10 @@ h1 { font-family:'Fraunces', serif; font-size:36px; font-weight:900; color:var(-
         <option value="100">100 videos (deep analysis, ~8 min)</option>
       </select>
     </div>
+    <div class="field" style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
+      <input type="checkbox" id="forceReprocess" style="width:18px;height:18px;accent-color:var(--accent)">
+      <label for="forceReprocess" style="font-size:13px;color:var(--muted);cursor:pointer;margin-bottom:0">Force reprocess (rebuild from scratch even if already analyzed)</label>
+    </div>
     <button class="submit-btn" id="submitBtn" onclick="startOnboarding()">Start Analysis</button>
   </div>
   <div class="progress-panel" id="progressPanel">
@@ -123,7 +127,7 @@ async function startOnboarding() {
   try {
     const resp = await fetch('/api/onboard', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ channel_url: url, creator_name: name, max_videos: parseInt(max) })
+      body: JSON.stringify({ channel_url: url, creator_name: name, max_videos: parseInt(max), force: document.getElementById('forceReprocess').checked })
     });
     const data = await resp.json();
     if (data.status === 'exists') {

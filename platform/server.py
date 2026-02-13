@@ -127,14 +127,19 @@ async def start_onboard(request: Request, background_tasks: BackgroundTasks):
     else:
         slug = f"creator_{uuid.uuid4().hex[:8]}"
 
-    # Check if already processed
-    if slug in creators:
+    # Check if already processed (allow force re-process)
+    force = body.get("force", False)
+    if slug in creators and not force:
         return JSONResponse({
             "status": "exists",
             "slug": slug,
             "url": f"/c/{slug}",
-            "message": f"{creators[slug]['name']} is already on the platform."
+            "message": f"{creators[slug]['name']} is already on the platform. Use force=true to re-process."
         })
+
+    # If forcing, remove old entry from registry (old bundle stays as backup)
+    if slug in creators:
+        creators.pop(slug, None)
 
     job_id = uuid.uuid4().hex[:12]
     jobs[job_id] = {
@@ -178,6 +183,129 @@ async def check_status(job_id: str):
 @app.get("/api/creators")
 async def list_creators():
     return JSONResponse({"creators": list(creators.values())})
+
+
+# ---------------------------------------------------------------------------
+# API: Refresh Creator (Incremental Update)
+# ---------------------------------------------------------------------------
+@app.post("/api/refresh/{slug}")
+async def refresh_creator(slug: str, background_tasks: BackgroundTasks):
+    creator = creators.get(slug)
+    if not creator:
+        raise HTTPException(404, f"Creator '{slug}' not found")
+
+    # Check if already refreshing
+    for j in jobs.values():
+        if j.get("slug") == slug and j.get("status") in ("queued", "processing"):
+            return JSONResponse({
+                "status": "already_running",
+                "job_id": j["id"],
+                "message": f"Refresh already in progress for {slug}"
+            })
+
+    # Get channel URL from manifest
+    bundle_dir = creator["path"]
+    manifest = json.loads((bundle_dir / "manifest.json").read_text(encoding="utf-8"))
+    channel_url = manifest.get("channel_url", "")
+    creator_name = manifest.get("channel", slug)
+
+    # If no channel_url in manifest, try to reconstruct it
+    if not channel_url:
+        channel_url = f"https://www.youtube.com/@{slug}"
+
+    job_id = uuid.uuid4().hex[:12]
+    jobs[job_id] = {
+        "id": job_id,
+        "slug": slug,
+        "channel_url": channel_url,
+        "creator_name": creator_name,
+        "status": "queued",
+        "progress": 0,
+        "step": "Starting refresh...",
+        "started_at": datetime.utcnow().isoformat(),
+        "completed_at": None,
+        "error": None,
+        "type": "refresh",
+    }
+
+    background_tasks.add_task(
+        run_refresh_pipeline, job_id, channel_url, slug, creator_name, bundle_dir
+    )
+
+    return JSONResponse({
+        "status": "started",
+        "job_id": job_id,
+        "slug": slug,
+        "message": f"Refreshing {creator_name}. New videos only — should be fast."
+    })
+
+
+async def run_refresh_pipeline(job_id: str, channel_url: str, slug: str,
+                               creator_name: str, bundle_dir: Path):
+    """Incremental refresh: only new videos, then re-run analytics + pages."""
+    job = jobs[job_id]
+    try:
+        from pipeline.ingest import incremental_update
+        from pipeline.enrich import enrich_bundle
+        from pipeline.voice import build_voice_profile
+        from pipeline.insights import build_insights
+        from pipeline.analytics import run_analytics
+        from pipeline.pages import build_all_pages
+
+        job["status"] = "processing"
+        job["step"] = "Scanning for new videos..."
+        job["progress"] = 10
+
+        result = await asyncio.to_thread(
+            incremental_update, channel_url, slug, creator_name, 100, bundle_dir
+        )
+        new_count = result.get("new_videos", 0)
+        job["progress"] = 40
+        job["step"] = f"Found {new_count} new videos" if new_count else "No new videos — updating analytics"
+
+        # Re-run enrich (updates channel metrics with fresh view counts)
+        job["step"] = "Updating channel metrics..."
+        job["progress"] = 50
+        await asyncio.to_thread(enrich_bundle, bundle_dir)
+
+        # Only rebuild voice if we have new content
+        if new_count > 0:
+            job["step"] = "Updating voice profile..."
+            job["progress"] = 60
+            await asyncio.to_thread(build_voice_profile, bundle_dir)
+
+        # Re-run insights and analytics (always — view counts may have changed)
+        job["step"] = "Regenerating insights..."
+        job["progress"] = 70
+        await asyncio.to_thread(build_insights, bundle_dir)
+
+        job["step"] = "Updating topic analytics..."
+        job["progress"] = 80
+        await asyncio.to_thread(run_analytics, bundle_dir)
+
+        # Rebuild pages
+        job["step"] = "Rebuilding pages..."
+        job["progress"] = 90
+        await asyncio.to_thread(build_all_pages, bundle_dir, slug)
+
+        # Update registry
+        manifest = json.loads((bundle_dir / "manifest.json").read_text(encoding="utf-8"))
+        creators[slug]["total_videos"] = manifest.get("total_videos", 0)
+        creators[slug]["created"] = manifest.get("created_at", "")
+
+        job["status"] = "complete"
+        job["progress"] = 100
+        job["step"] = f"Refresh done! {new_count} new video{'s' if new_count != 1 else ''} added." if new_count else "Refresh done! Analytics updated with latest view counts."
+        job["completed_at"] = datetime.utcnow().isoformat()
+        job["url"] = f"/c/{slug}"
+        job["new_videos"] = new_count
+
+    except Exception as e:
+        job["status"] = "error"
+        job["error"] = str(e)
+        job["step"] = f"Error: {str(e)[:200]}"
+        import traceback
+        traceback.print_exc()
 
 
 # ---------------------------------------------------------------------------

@@ -308,7 +308,7 @@ def embed_chunks(chunks, batch_size=20):
 
 # --- Step 5: Save Bundle ---
 
-def save_bundle(slug, channel_name, videos, transcripts, chunks, bundle_dir):
+def save_bundle(slug, channel_name, videos, transcripts, chunks, bundle_dir, channel_url=""):
     """Save all data to bundle directory."""
     # Sources
     sources = []
@@ -352,6 +352,7 @@ def save_bundle(slug, channel_name, videos, transcripts, chunks, bundle_dir):
     manifest = {
         "slug": slug,
         "channel": channel_name,
+        "channel_url": channel_url,
         "created_at": datetime.utcnow().isoformat(),
         "total_videos": len(videos),
         "transcribed_videos": len(transcripts),
@@ -370,6 +371,135 @@ def save_bundle(slug, channel_name, videos, transcripts, chunks, bundle_dir):
 
     print(f"Bundle saved: {bundle_dir}")
     return manifest
+
+
+# --- Incremental Update ---
+
+def incremental_update(channel_url, slug, creator_name, max_videos, bundle_dir):
+    """
+    Incremental update: only process NEW videos not already in the bundle.
+    Merges new data into existing sources.json and chunks.json.
+    Returns dict with stats.
+    """
+    print(f"\n{'='*60}")
+    print(f"  Incremental update: {creator_name or slug}")
+    print(f"  Bundle: {bundle_dir}")
+    print(f"{'='*60}")
+
+    # Load existing data
+    sources_path = bundle_dir / "sources.json"
+    chunks_path = bundle_dir / "chunks.json"
+    manifest_path = bundle_dir / "manifest.json"
+
+    existing_sources = []
+    existing_chunks = []
+    if sources_path.exists():
+        existing_sources = json.loads(sources_path.read_text(encoding="utf-8"))
+    if chunks_path.exists():
+        existing_chunks = json.loads(chunks_path.read_text(encoding="utf-8"))
+
+    existing_ids = {s["source_id"] for s in existing_sources}
+    print(f"   Existing videos in bundle: {len(existing_ids)}")
+
+    # Step 1: Scan channel for current videos
+    all_videos = get_channel_videos(channel_url, max_videos)
+    if not all_videos:
+        print("   No videos found on channel")
+        return {"video_count": len(existing_sources), "new_videos": 0, "chunk_count": len(existing_chunks)}
+
+    # Find new videos
+    new_videos = [v for v in all_videos if v["video_id"] not in existing_ids]
+    print(f"   New videos found: {len(new_videos)}")
+
+    if not new_videos:
+        # No new videos — still update manifest timestamp
+        if manifest_path.exists():
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["last_refreshed"] = datetime.utcnow().isoformat()
+            manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+        print("   Bundle is already up to date")
+        return {"video_count": len(existing_sources), "new_videos": 0, "chunk_count": len(existing_chunks)}
+
+    # Step 2: Pull transcripts for new videos only
+    transcripts, failed = batch_get_transcripts(new_videos)
+    print(f"   New transcripts: {len(transcripts)}")
+
+    # Step 3: Chunk new transcripts
+    new_chunks = []
+    for vid, transcript in transcripts.items():
+        chunks = chunk_transcript(transcript["segments"], vid)
+        new_chunks.extend(chunks)
+    print(f"   New chunks: {len(new_chunks)}")
+
+    # Step 4: Embed new chunks
+    if new_chunks:
+        new_chunks = embed_chunks(new_chunks)
+
+    # Step 5: Merge into existing data
+    # Update sources — also refresh view counts for existing videos
+    video_map = {v["video_id"]: v for v in all_videos}
+    updated_sources = []
+    for s in existing_sources:
+        vid = s["source_id"]
+        if vid in video_map:
+            # Update view count from fresh scan
+            s["views"] = video_map[vid].get("views", s.get("views", 0))
+            s["published_text"] = video_map[vid].get("published_text", s.get("published_text", ""))
+        updated_sources.append(s)
+
+    # Add new sources
+    for v in new_videos:
+        vid = v["video_id"]
+        has_transcript = vid in transcripts
+        seg_count = len(transcripts[vid]["segments"]) if has_transcript else 0
+        updated_sources.append({
+            "source_id": vid,
+            "platform": "youtube",
+            "url": v["url"],
+            "title": v["title"],
+            "duration_text": v.get("duration_text", ""),
+            "views": v.get("views", 0),
+            "published_text": v.get("published_text", ""),
+            "has_transcript": has_transcript,
+            "segment_count": seg_count,
+        })
+
+    # Merge chunks
+    merged_chunks = existing_chunks + [{
+        "chunk_id": c["chunk_id"],
+        "video_id": c["video_id"],
+        "text": c["text"],
+        "timestamp": c["timestamp"],
+        "word_count": c["word_count"],
+        "embedding": c.get("embedding", []),
+    } for c in new_chunks]
+
+    # Save merged data
+    sources_path.write_text(json.dumps(updated_sources, indent=2), encoding="utf-8")
+    chunks_path.write_text(json.dumps(merged_chunks, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    # Update manifest
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8")) if manifest_path.exists() else {}
+    manifest["total_videos"] = len(updated_sources)
+    manifest["transcribed_videos"] = len([s for s in updated_sources if s.get("has_transcript")])
+    manifest["total_chunks"] = len(merged_chunks)
+    manifest["last_refreshed"] = datetime.utcnow().isoformat()
+    manifest["refresh_history"] = manifest.get("refresh_history", []) + [{
+        "timestamp": datetime.utcnow().isoformat(),
+        "new_videos": len(new_videos),
+        "new_transcripts": len(transcripts),
+        "new_chunks": len(new_chunks),
+    }]
+    manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+
+    print(f"   Merge complete: {len(updated_sources)} total sources, {len(merged_chunks)} total chunks")
+    return {
+        "video_count": len(updated_sources),
+        "new_videos": len(new_videos),
+        "new_transcripts": len(transcripts),
+        "chunk_count": len(merged_chunks),
+        "new_chunks": len(new_chunks),
+    }
 
 
 # --- Main Entry Point ---
@@ -415,7 +545,7 @@ def ingest_channel(channel_url, slug, creator_name, max_videos, bundle_dir):
 
     # Step 5: Save
     channel_name = creator_name or slug
-    manifest = save_bundle(slug, channel_name, videos, transcripts, all_chunks, bundle_dir)
+    manifest = save_bundle(slug, channel_name, videos, transcripts, all_chunks, bundle_dir, channel_url)
 
     return {
         "video_count": len(videos),
