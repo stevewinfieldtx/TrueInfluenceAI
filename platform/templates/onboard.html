@@ -81,6 +81,15 @@ h1 { font-family:'Fraunces', serif; font-size:36px; font-weight:900; color:var(-
         <option value="100">100 videos (deep analysis, ~8 min)</option>
       </select>
     </div>
+    <div class="field">
+      <label>Content Type</label>
+      <select id="tradition" style="background:var(--bg);color:var(--bright);padding:14px 18px;border:1px solid var(--border);border-radius:10px;font-size:15px;font-family:inherit;width:100%">
+        <option value="none" selected>General (no scripture detection)</option>
+        <option value="christian">Christian (Bible)</option>
+        <option value="lds">Latter-day Saints (Bible + BoM + D&C)</option>
+      </select>
+      <div class="hint">For religious content creators — detects and indexes scripture references</div>
+    </div>
     <div class="field" style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
       <input type="checkbox" id="forceReprocess" style="width:18px;height:18px;accent-color:var(--accent)">
       <label for="forceReprocess" style="font-size:13px;color:var(--muted);cursor:pointer;margin-bottom:0">Force reprocess (rebuild from scratch even if already analyzed)</label>
@@ -99,6 +108,7 @@ h1 { font-family:'Fraunces', serif; font-size:36px; font-weight:900; color:var(-
       <div class="ps" data-step="voice"><span class="icon">...</span> Building voice profile</div>
       <div class="ps" data-step="insights"><span class="icon">...</span> Generating strategic insights</div>
       <div class="ps" data-step="analytics"><span class="icon">...</span> Running topic analytics</div>
+      <div class="ps" data-step="scripture"><span class="icon">...</span> Detecting scripture references</div>
       <div class="ps" data-step="pages"><span class="icon">...</span> Building creator pages</div>
     </div>
   </div>
@@ -127,7 +137,7 @@ async function startOnboarding() {
   try {
     const resp = await fetch('/api/onboard', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ channel_url: url, creator_name: name, max_videos: parseInt(max), force: document.getElementById('forceReprocess').checked })
+      body: JSON.stringify({ channel_url: url, creator_name: name, max_videos: parseInt(max), force: document.getElementById('forceReprocess').checked, tradition: document.getElementById('tradition').value })
     });
     const data = await resp.json();
     if (data.status === 'exists') {

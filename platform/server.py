@@ -114,6 +114,7 @@ async def start_onboard(request: Request, background_tasks: BackgroundTasks):
     channel_url = body.get("channel_url", "").strip()
     creator_name = body.get("creator_name", "").strip()
     max_videos = min(int(body.get("max_videos", 50)), 100)
+    tradition = body.get("tradition", "none").strip()
 
     if not channel_url:
         raise HTTPException(400, "channel_url is required")
@@ -156,7 +157,7 @@ async def start_onboard(request: Request, background_tasks: BackgroundTasks):
     }
 
     # Run pipeline in background
-    background_tasks.add_task(run_pipeline, job_id, channel_url, slug, creator_name, max_videos)
+    background_tasks.add_task(run_pipeline, job_id, channel_url, slug, creator_name, max_videos, tradition)
 
     return JSONResponse({
         "status": "started",
@@ -283,6 +284,18 @@ async def run_refresh_pipeline(job_id: str, channel_url: str, slug: str,
         job["progress"] = 80
         await asyncio.to_thread(run_analytics, bundle_dir)
 
+        # Re-run scripture detection if tradition is set and we have new content
+        if new_count > 0:
+            tradition = manifest.get("tradition", "")
+            if tradition and tradition != "none":
+                try:
+                    from pipeline.scripture import process_bundle_scriptures
+                    job["step"] = f"Updating scripture index ({tradition})..."
+                    job["progress"] = 85
+                    await asyncio.to_thread(process_bundle_scriptures, bundle_dir, tradition)
+                except Exception as e:
+                    print(f"Scripture refresh error (non-fatal): {e}")
+
         # Rebuild pages
         job["step"] = "Rebuilding pages..."
         job["progress"] = 90
@@ -359,7 +372,7 @@ async def creator_discuss(slug: str):
 # Pipeline Runner (background task)
 # ---------------------------------------------------------------------------
 async def run_pipeline(job_id: str, channel_url: str, slug: str,
-                       creator_name: str, max_videos: int):
+                       creator_name: str, max_videos: int, tradition: str = "none"):
     """
     Full processing pipeline:
       1. Scan channel (scrapetube)
@@ -416,16 +429,30 @@ async def run_pipeline(job_id: str, channel_url: str, slug: str,
         job["progress"] = 80
         await asyncio.to_thread(run_analytics, bundle_dir)
 
+        # Step 8.5: Scripture detection (if religious tradition selected)
+        if tradition and tradition != "none":
+            try:
+                from pipeline.scripture import process_bundle_scriptures
+                job["step"] = f"Detecting scripture references ({tradition})..."
+                job["progress"] = 85
+                await asyncio.to_thread(process_bundle_scriptures, bundle_dir, tradition)
+            except ImportError:
+                print("Scripture module not found, skipping")
+            except Exception as e:
+                print(f"Scripture detection error (non-fatal): {e}")
+
         # Step 9: Build pages
         job["step"] = "Building creator pages..."
         job["progress"] = 90
         await asyncio.to_thread(build_all_pages, bundle_dir, slug)
 
-        # Update manifest with slug
+        # Update manifest with slug and tradition
         manifest_path = bundle_dir / "manifest.json"
         if manifest_path.exists():
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             manifest["slug"] = slug
+            if tradition and tradition != "none":
+                manifest["tradition"] = tradition
             manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
         # Register creator
