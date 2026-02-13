@@ -76,22 +76,23 @@ def _extract_topics(sources, chunks):
         if not text:
             continue
 
-        prompt = f"""Extract 3-5 SPECIFIC content topics from this video transcript.
+        prompt = f"""Extract 3-5 content topics from this video transcript.
 Video title: "{s.get('title', '')}"
 
 Transcript excerpt:
 {text}
 
 RULES:
-- Each topic must be SPECIFIC to what was actually discussed, not a broad category
-- BAD: "Safety concerns", "Cost of living", "Expat life" (too vague)
-- GOOD: "Vietnam scam tactics", "Da Nang monthly budget breakdown", "Expat loneliness in Southeast Asia" (specific)
-- Topics should describe the ANGLE or ARGUMENT, not just the subject area
-- If the video warns about something, the topic should reflect that (e.g. "Countries to avoid in Asia" not "Safety concerns")
+- Topics should be REUSABLE across multiple videos — think "content pillars" not one-off labels
+- BAD (too specific to one video): "Panama's retiree-friendly visa", "Da Nang studio apartment costs", "San Francisco's post-2008 struggle"
+- BAD (too vague): "Expat life", "Travel tips", "Money"
+- GOOD (reusable themes): "Visa options for retirees", "Cost of living breakdown", "Expat loneliness", "Why people leave Vietnam", "Healthcare abroad"
+- Ask yourself: "Could another video on this channel also get this same topic?" If not, make it broader.
 - Each topic should be 3-6 words
+- Focus on the AUDIENCE NEED the video serves, not the specific details
 
 Return ONLY a JSON array of topic strings.
-Example: ["Countries to avoid retiring in", "Vietnam visa run elimination", "$1500/month retirement budget"]"""
+Example: ["Visa options for retirees", "Cost of living abroad", "Expat relationship challenges"]"""
 
         try:
             resp = requests.post(

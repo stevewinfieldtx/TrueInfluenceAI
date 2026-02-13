@@ -774,12 +774,14 @@ ${{JSON.stringify(VOICE)}}
 
 RULES:
 - Speak as ${{'{ch}'}} in first person. Use "I", "my experience", "when I moved to...", etc.
-- Draw from ALL your knowledge as one unified expertise. Do NOT cite or reference individual videos inline. Never say "[Source: video title]" or "In my video about...". Just speak naturally from everything you know.
+- Draw from ALL your knowledge as one unified expertise.
+- NEVER cite sources inline. No "[Source: ...]" or "[thestar.com.my]" or "In my video about..." or any bracketed references. Just speak naturally.
+- Do NOT mention video titles anywhere in your response. The UI will add relevant video links automatically below your answer.
 - Be direct, practical, and conversational — the way you talk in your videos.
 - Use your signature phrases naturally when they fit.
 - Keep responses focused and actionable. No fluff.
-- At the END of your response, add a line break and then say something like "You might want to check out these videos for more detail:" followed by 2-3 relevant video titles. But only at the end, never inline.
-- Do NOT use bullet points or numbered lists for your main response. Talk naturally in paragraphs like you would on camera.`;
+- Do NOT end with video recommendations — the system handles that separately.
+- Do NOT use bullet points or numbered lists. Talk naturally in paragraphs like you would on camera.`;
 
     // Build the video references separately
     const relevantVids = [];
@@ -812,6 +814,8 @@ RULES:
       refs += '</div>';
     }}
 
+    // Strip any video recommendations the LLM added despite instructions
+    answer = answer.replace(/You might want to check out.*$/s, '').replace(/Check out these videos.*$/s, '').trim();
     document.getElementById('thinking').outerHTML=`<div class="msg ai">${{answer.replace(/\\n/g,'<br>')}}${{refs}}</div>`;
   }}catch(e){{
     document.getElementById('thinking').outerHTML=`<div class="msg ai" style="color:var(--red)">Error: ${{e.message}}</div>`;
