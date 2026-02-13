@@ -495,13 +495,14 @@ class TopicCategorizer:
         )
         
         # Build base entry
+        # IMPORTANT: 'vs_channel' key name must match dashboard JS (not 'vs_channel_avg')
         entry = {
             'topic': topic,
             'video_count': stats.video_count,
             'avg_views': stats.mean_views,
             'median_views': stats.median_views,
             'weighted_avg_views': stats.weighted_avg_views,
-            'vs_channel_avg': stats.vs_channel_avg,
+            'vs_channel': stats.vs_channel_avg,
             'z_score': stats.z_score,
             'confidence_level': stats.confidence_level,
             'confidence_interval': stats.confidence_interval_95,
