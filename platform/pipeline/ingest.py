@@ -30,6 +30,7 @@ except ImportError:
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "qwen/qwen3-embedding-8b")
+PROXY_URL = os.getenv("PROXY_URL", "")
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 50
 
@@ -145,7 +146,7 @@ def get_transcript_api(video_id):
         print(f"      [API fallback] skipped - youtube-transcript-api not installed")
         return None
     try:
-        ytt = YouTubeTranscriptApi()
+        ytt = YouTubeTranscriptApi(proxy_url=PROXY_URL) if PROXY_URL else YouTubeTranscriptApi()
         langs = ["en", "pt", "pt-BR", "es", "fr", "de", "it", "ja", "ko", "zh-Hans", "hi"]
 
         # Try fetching with our preferred languages first
