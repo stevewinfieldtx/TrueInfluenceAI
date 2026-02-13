@@ -1,8 +1,13 @@
 """
-TrueInfluenceAI - Cloud Page Builder
-======================================
-Generates all creator HTML pages for cloud serving.
-Pages use /c/{slug}/ paths for navigation.
+TrueInfluenceAI - Interactive Dashboard Pages v2
+===================================================
+Three-layer interactive dashboard:
+  Layer 1: Dashboard cards (Double Down, Untapped, Resurface, Stop Making)
+  Layer 2: Expanded detail with two action buttons
+  Layer 3a: Deep stats (filtered analytics)
+  Layer 3b: Content starter (voice-matched writing help)
+
+Also builds: index, analytics, discuss pages.
 """
 
 import os, json
@@ -10,27 +15,40 @@ from pathlib import Path
 from datetime import datetime
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+OPENROUTER_MODEL_ID = os.getenv("OPENROUTER_MODEL_ID", "anthropic/claude-sonnet-4-20250514")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "qwen/qwen3-embedding-8b")
 
-# Shared CSS variables
+# ─── Shared Styles ──────────────────────────────────────────────
+FONTS = '<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Fraunces:opsz,wght@9..144,400;9..144,700;9..144,900&display=swap" rel="stylesheet">'
+
 THEME_CSS = """
-:root{--bg:#0a0b10;--surface:#0f1118;--border:#1c1f2e;--accent:#7c6aff;--accent-glow:#9d8fff;
---text:#c8c8d4;--bright:#f0f0f8;--muted:#5a5b70;--green:#6bcb77;--red:#ff6b6b;--gold:#ffc857}
+:root{
+  --bg:#06070b;--surface:#0c0d14;--surface2:#12131c;--border:#1a1c2a;
+  --accent:#6366f1;--accent-glow:#818cf8;--accent-soft:rgba(99,102,241,.08);
+  --text:#9ca3af;--bright:#f1f5f9;--muted:#4b5563;
+  --green:#34d399;--green-soft:rgba(52,211,153,.1);
+  --red:#f87171;--red-soft:rgba(248,113,113,.1);
+  --gold:#fbbf24;--gold-soft:rgba(251,191,36,.1);
+  --blue:#60a5fa;--blue-soft:rgba(96,165,250,.1);
+}
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
 a{color:var(--accent-glow);text-decoration:none}a:hover{color:var(--bright)}
+.container{max-width:1140px;margin:0 auto;padding:32px 24px}
+h2{font-family:'Fraunces',serif;font-size:32px;font-weight:900;color:var(--bright);margin-bottom:6px}
+h3{font-family:'Fraunces',serif;font-size:20px;font-weight:700;color:var(--bright);margin:32px 0 16px}
+.sub{color:var(--muted);font-size:14px;margin-bottom:32px}
 """
 
 NAV_CSS = """
-nav{padding:16px 32px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:50;backdrop-filter:blur(12px)}
-nav .logo{font-family:'Playfair Display',serif;font-size:20px;font-weight:900;color:var(--bright)}
+nav{padding:14px 32px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);background:rgba(12,13,20,.85);position:sticky;top:0;z-index:50;backdrop-filter:blur(16px)}
+nav .logo{font-family:'Fraunces',serif;font-size:18px;font-weight:900;color:var(--bright)}
 nav .logo span{color:var(--accent)}
-nav .links a{color:var(--muted);font-size:14px;text-decoration:none;margin-left:24px;transition:color .2s}
-nav .links a:hover{color:var(--bright)}
-nav .links a.active{color:var(--accent);font-weight:600}
+nav .links{display:flex;gap:4px}
+nav .links a{color:var(--muted);font-size:13px;font-weight:500;padding:6px 14px;border-radius:8px;transition:all .2s}
+nav .links a:hover{color:var(--bright);background:var(--accent-soft)}
+nav .links a.active{color:var(--accent-glow);background:var(--accent-soft)}
 """
-
-FONTS = '<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">'
 
 
 def _nav_html(channel, slug, active):
@@ -38,7 +56,7 @@ def _nav_html(channel, slug, active):
     def cls(name):
         return ' class="active"' if name == active else ''
     return f"""<nav>
-<div class="logo"><span>TrueInfluence</span>AI - {channel}</div>
+<div class="logo"><span>TrueInfluence</span>AI · {channel}</div>
 <div class="links">
 <a href="{base}"{cls('home')}>Home</a>
 <a href="{base}/dashboard"{cls('dashboard')}>Dashboard</a>
@@ -47,19 +65,7 @@ def _nav_html(channel, slug, active):
 </div></nav>"""
 
 
-def build_all_pages(bundle_dir, slug):
-    """Build all 4 creator pages."""
-    bundle_dir = Path(bundle_dir)
-    data = _load_bundle(bundle_dir)
-    data["slug"] = slug
-    print(f"Building pages for {slug}...")
-    _build_index(bundle_dir, data)
-    _build_dashboard(bundle_dir, data)
-    _build_analytics(bundle_dir, data)
-    _build_discuss(bundle_dir, data)
-    print(f"   All 4 pages built")
-
-
+# ─── Data Loading ───────────────────────────────────────────────
 def _load_bundle(bp):
     data = {}
     for name in ["manifest", "sources", "chunks", "analytics_report",
@@ -72,6 +78,115 @@ def _load_bundle(bp):
     return data
 
 
+# ─── Categorize Topics into 4 Buckets ──────────────────────────
+def _categorize_topics(data):
+    """Analyze topics and sort into: double_down, untapped, resurface, stop_making."""
+    analytics = data.get("analytics_report", {})
+    performance = analytics.get("topic_performance", {})
+    timeline = analytics.get("topic_timeline", {})
+    topic_map = analytics.get("topic_map", {})
+    sources = data.get("sources", [])
+    metrics = data.get("channel_metrics", {})
+    channel_avg = metrics.get("channel_avg_views", 1)
+
+    source_map = {s["source_id"]: s for s in sources}
+
+    double_down = []   # High performing, room to grow
+    untapped = []      # One video, way above average
+    resurface = []     # Old hits worth updating
+    stop_making = []   # Consistently underperforms
+
+    seen_topics = set()
+
+    for topic, perf in sorted(performance.items(), key=lambda x: -x[1].get("weighted_avg_views", 0)):
+        if topic in seen_topics:
+            continue
+        seen_topics.add(topic)
+
+        vs = perf.get("vs_channel_avg", 0)
+        count = perf.get("video_count", 0)
+        avg_views = perf.get("weighted_avg_views", 0)
+        tl = timeline.get(topic, {})
+        videos = tl.get("videos", [])
+
+        # Find the actual video data for this topic
+        video_details = []
+        for v in videos:
+            vid = v.get("video_id", "")
+            s = source_map.get(vid, {})
+            video_details.append({
+                "video_id": vid,
+                "title": s.get("title", v.get("title", "")),
+                "views": s.get("views", 0),
+                "published": v.get("published", s.get("published_text", "")),
+                "url": s.get("url", f"https://www.youtube.com/watch?v={vid}"),
+            })
+
+        entry = {
+            "topic": topic,
+            "vs_channel": vs,
+            "avg_views": avg_views,
+            "video_count": count,
+            "videos": video_details,
+        }
+
+        # Resurface: old content that crushed it (>50% above avg, oldest video >6 months)
+        if vs > 50 and count <= 3 and video_details:
+            pub = video_details[0].get("published", "")
+            if any(kw in pub.lower() for kw in ["year", "month", "years", "months"]):
+                # Parse rough age
+                is_old = False
+                for kw in ["1 year", "2 year", "years", "8 month", "9 month", "10 month", "11 month"]:
+                    if kw in pub.lower():
+                        is_old = True
+                        break
+                if is_old:
+                    entry["reason"] = f"Got {avg_views:,.0f} views ({vs:+.0f}% vs avg) but hasn't been updated. Time for a 2026 refresh."
+                    resurface.append(entry)
+                    continue
+
+        # Untapped: 1 video, way above average (>100%)
+        if count == 1 and vs > 100:
+            entry["reason"] = f"One video got {avg_views:,.0f} views — {vs:+.0f}% above your average. Your audience is hungry for more."
+            untapped.append(entry)
+            continue
+
+        # Double Down: multiple videos, consistently above average
+        if count >= 2 and vs > 20:
+            entry["reason"] = f"{count} videos averaging {avg_views:,.0f} views ({vs:+.0f}% above avg). This is your lane — keep going."
+            double_down.append(entry)
+            continue
+
+        # Stop Making: consistently below average
+        if vs < -40 and count >= 1:
+            entry["reason"] = f"{avg_views:,.0f} avg views — {abs(vs):.0f}% below your channel average. Your audience isn't here for this."
+            stop_making.append(entry)
+            continue
+
+    return {
+        "double_down": double_down[:6],
+        "untapped": untapped[:6],
+        "resurface": resurface[:6],
+        "stop_making": stop_making[:6],
+    }
+
+
+# ─── Build All Pages ───────────────────────────────────────────
+def build_all_pages(bundle_dir, slug):
+    """Build all 4 creator pages."""
+    bundle_dir = Path(bundle_dir)
+    data = _load_bundle(bundle_dir)
+    data["slug"] = slug
+    data["categories"] = _categorize_topics(data)
+    print(f"Building pages for {slug}...")
+    _build_index(bundle_dir, data)
+    _build_dashboard(bundle_dir, data)
+    _build_analytics(bundle_dir, data)
+    _build_discuss(bundle_dir, data)
+    print(f"   All 4 pages built")
+
+
+# ─── INDEX PAGE ─────────────────────────────────────────────────
 def _build_index(bp, data):
     ch = data["manifest"].get("channel", "Unknown")
     slug = data["slug"]
@@ -82,168 +197,460 @@ def _build_index(bp, data):
     tc = data["manifest"].get("total_chunks", 0)
     av = m.get("channel_avg_views", 0)
     tvw = m.get("total_views", 0)
-    eng = m.get("channel_engagement_rate", 0)
     topics = data.get("analytics_report", {}).get("total_topics", 0)
+    cats = data.get("categories", {})
     base = f"/c/{slug}"
 
-    voice_block = f'<div class="voice-bar"><div class="vl">Voice Profile</div><div class="vt">{tone}</div></div>' if tone else ""
+    # Quick wins summary
+    dd_count = len(cats.get("double_down", []))
+    ut_count = len(cats.get("untapped", []))
+    rs_count = len(cats.get("resurface", []))
 
     html = f"""<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>{ch} -- TrueInfluenceAI</title>{FONTS}
+<title>{ch} · TrueInfluenceAI</title>{FONTS}
 <style>{THEME_CSS}
-.hero{{text-align:center;padding:60px 24px 40px;background:linear-gradient(135deg,var(--surface) 0%,#141630 50%,var(--surface) 100%);border-bottom:1px solid var(--border)}}
-.hero h1{{font-family:'Playfair Display',serif;font-size:42px;font-weight:900;color:var(--bright);margin-bottom:8px}}
+.hero{{text-align:center;padding:80px 24px 60px;position:relative;overflow:hidden}}
+.hero::before{{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:600px;height:600px;background:radial-gradient(circle,rgba(99,102,241,.06) 0%,transparent 70%);pointer-events:none}}
+.hero h1{{font-family:'Fraunces',serif;font-size:48px;font-weight:900;color:var(--bright);margin-bottom:8px;position:relative}}
 .hero h1 span{{color:var(--accent)}}
-.hero .sub{{font-size:15px;color:var(--muted);max-width:600px;margin:0 auto 24px;line-height:1.6}}
-.stats-row{{display:flex;justify-content:center;gap:32px;flex-wrap:wrap;margin-top:24px}}
-.stat{{text-align:center}}.stat .sv{{font-size:28px;font-weight:700;color:var(--bright)}}
-.stat .sl{{font-size:11px;color:var(--muted);text-transform:uppercase;margin-top:2px;letter-spacing:.5px}}
-.cards{{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;max-width:1000px;margin:48px auto;padding:0 24px}}
-.card{{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:36px 28px;text-align:center;cursor:pointer;transition:all .2s;text-decoration:none;color:inherit}}
-.card:hover{{transform:translateY(-4px);border-color:var(--accent);box-shadow:0 8px 32px rgba(124,106,255,.15)}}
-.card .icon{{font-size:48px;margin-bottom:16px}}.card h3{{font-size:18px;color:var(--bright);margin-bottom:8px}}
+.hero .tagline{{font-size:16px;color:var(--muted);max-width:500px;margin:0 auto 40px;line-height:1.6}}
+.stats{{display:flex;justify-content:center;gap:48px;flex-wrap:wrap;margin-bottom:40px;position:relative}}
+.stat{{text-align:center}}.stat .n{{font-family:'Fraunces',serif;font-size:36px;font-weight:900;color:var(--bright)}}
+.stat .l{{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;margin-top:4px}}
+.voice{{max-width:600px;margin:0 auto;padding:20px 24px;background:var(--surface);border:1px solid var(--border);border-radius:12px;text-align:left}}
+.voice .vl{{font-size:10px;color:var(--accent);text-transform:uppercase;letter-spacing:1.5px;font-weight:700;margin-bottom:6px}}
+.voice .vt{{font-size:14px;color:var(--text);line-height:1.6;font-style:italic}}
+.cards{{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;max-width:960px;margin:60px auto;padding:0 24px}}
+.card{{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:32px 24px;text-align:center;cursor:pointer;transition:all .25s;text-decoration:none;color:inherit;position:relative;overflow:hidden}}
+.card:hover{{transform:translateY(-3px);border-color:var(--accent);box-shadow:0 12px 40px rgba(99,102,241,.12)}}
+.card .icon{{font-size:40px;margin-bottom:14px}}.card h3{{font-family:'Fraunces',serif;font-size:17px;color:var(--bright);margin-bottom:8px}}
 .card p{{font-size:13px;color:var(--muted);line-height:1.5}}
-.card .tag{{display:inline-block;margin-top:14px;padding:4px 14px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(124,106,255,.12);color:var(--accent-glow)}}
-.voice-bar{{max-width:700px;margin:28px auto 0;padding:16px 24px;background:#141630;border-radius:12px;border:1px solid var(--border);text-align:left}}
-.voice-bar .vl{{font-size:10px;color:var(--accent);text-transform:uppercase;letter-spacing:1px;font-weight:700;margin-bottom:6px}}
-.voice-bar .vt{{font-size:13px;color:var(--muted);line-height:1.5;font-style:italic}}
-.footer{{text-align:center;padding:40px 24px;font-size:11px;color:#333}}
-@media(max-width:700px){{.cards{{grid-template-columns:1fr}}.stats-row{{gap:20px}}}}
+.card .badge{{display:inline-block;margin-top:14px;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600}}
+.footer{{text-align:center;padding:48px 24px;font-size:12px;color:var(--muted)}}
+@media(max-width:700px){{.cards{{grid-template-columns:1fr}}.stats{{gap:24px}}}}
 </style></head><body>
 <div class="hero">
 <h1><span>TrueInfluence</span>AI</h1>
-<div class="sub">Creator Intelligence Platform for <strong style="color:var(--bright)">{ch}</strong></div>
-<div class="stats-row">
-<div class="stat"><div class="sv">{tv}</div><div class="sl">Videos Analyzed</div></div>
-<div class="stat"><div class="sv">{tc:,}</div><div class="sl">Content Chunks</div></div>
-<div class="stat"><div class="sv">{av:,}</div><div class="sl">Avg Views</div></div>
-<div class="stat"><div class="sv">{tvw:,}</div><div class="sl">Total Views</div></div>
-<div class="stat"><div class="sv">{eng}%</div><div class="sl">Engagement</div></div>
-<div class="stat"><div class="sv">{topics}</div><div class="sl">Topics Tracked</div></div>
-</div>{voice_block}</div>
-<div class="cards">
-<a class="card" href="{base}/dashboard"><div class="icon">&#128202;</div><h3>Dashboard</h3><p>Strategic insights, content gaps, and AI-powered recommendations.</p><span class="tag">Interactive</span></a>
-<a class="card" href="{base}/analytics"><div class="icon">&#128200;</div><h3>Analytics</h3><p>Topic trends, performance vs channel average, content evolution.</p><span class="tag">{topics} Topics</span></a>
-<a class="card" href="{base}/discuss"><div class="icon">&#128172;</div><h3>Discuss</h3><p>Chat with AI trained on {ch}'s content and expertise.</p><span class="tag">AI-Powered</span></a>
+<div class="tagline">Creator Intelligence for <strong style="color:var(--bright)">{ch}</strong></div>
+<div class="stats">
+<div class="stat"><div class="n">{tv}</div><div class="l">Videos</div></div>
+<div class="stat"><div class="n">{av:,}</div><div class="l">Avg Views</div></div>
+<div class="stat"><div class="n">{tvw:,}</div><div class="l">Total Views</div></div>
+<div class="stat"><div class="n">{topics}</div><div class="l">Topics</div></div>
 </div>
-<div class="footer"><a href="/" style="color:var(--muted);font-size:13px">Back to TrueInfluenceAI Platform</a><br><br>Powered by <a href="/" style="color:var(--accent)">TrueInfluenceAI</a> - Built by WinTech Partners</div>
+{'<div class="voice"><div class="vl">Voice Profile</div><div class="vt">'+tone+'</div></div>' if tone else ''}
+</div>
+<div class="cards">
+<a class="card" href="{base}/dashboard"><div class="icon">🎯</div><h3>Dashboard</h3><p>What to make next, what to stop, and hidden gems to resurface.</p>
+<span class="badge" style="background:var(--green-soft);color:var(--green)">{ut_count + dd_count} opportunities</span></a>
+<a class="card" href="{base}/analytics"><div class="icon">📊</div><h3>Analytics</h3><p>Every topic scored against your channel average with trend data.</p>
+<span class="badge" style="background:var(--accent-soft);color:var(--accent-glow)">{topics} topics tracked</span></a>
+<a class="card" href="{base}/discuss"><div class="icon">💬</div><h3>Discuss</h3><p>Chat with AI trained on {ch}'s content and voice.</p>
+<span class="badge" style="background:var(--gold-soft);color:var(--gold)">AI-Powered</span></a>
+</div>
+<div class="footer">Powered by <a href="/" style="color:var(--accent)">TrueInfluenceAI</a> · Built by WinTech Partners</div>
 </body></html>"""
     (bp / "index.html").write_text(html, encoding="utf-8")
 
 
+# ─── DASHBOARD PAGE (The Big One) ──────────────────────────────
 def _build_dashboard(bp, data):
     ch = data["manifest"].get("channel", "Unknown")
     slug = data["slug"]
+    cats = data.get("categories", {})
     insights_data = data.get("insights", {})
-    analytics = data.get("analytics_report", {})
     direction = insights_data.get("strategic_direction", "")
-    insight_list = insights_data.get("insights", [])
-    gaps = insights_data.get("content_gaps", [])
-    recs = analytics.get("recommendations", {}).get("recommendations", [])
+    voice = data.get("voice_profile", {})
 
-    insight_html = ""
-    for ins in insight_list[:12]:
-        c = {"opportunity":"var(--green)","warning":"var(--red)","strength":"var(--accent)","trend":"var(--gold)"}.get(ins.get("type",""),"var(--accent)")
-        p = {"high":"HIGH","medium":"MED","low":"LOW"}.get(ins.get("priority",""),"")
-        insight_html += f'<div class="icard" style="border-left:3px solid {c}"><div class="ih"><span>{p}</span><span style="color:{c}">{ins.get("type","")}</span></div><h4>{ins.get("title","")}</h4><p>{ins.get("description","")}</p><div class="ia">Action: {ins.get("action","")}</div></div>'
-
-    gap_html = ""
-    for g in gaps[:8]:
-        gap_html += f'<div class="gcard"><div class="gscore">{g.get("opportunity_score",0)}</div><div><h4>{g.get("topic","")}</h4><p>{g.get("reasoning","")}</p></div></div>'
-
-    rec_html = ""
-    for r in recs[:7]:
-        icon = {"double_down":"TARGET","explore":"EXPLORE","evolve":"EVOLVE","optimize":"OPTIMIZE"}.get(r.get("category",""),"TIP")
-        rec_html += f'<div class="rcard"><span style="font-size:14px;color:var(--accent)">[{icon}]</span><h4>{r.get("title","")}</h4><p>{r.get("description","")}</p><span class="rimpact">Impact: {r.get("expected_impact","").upper()}</span></div>'
+    # Encode data for JavaScript
+    cats_json = json.dumps(cats, ensure_ascii=False)
+    voice_json = json.dumps(voice, ensure_ascii=False)
 
     html = f"""<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>{ch} Dashboard -- TrueInfluenceAI</title>{FONTS}
+<title>{ch} Dashboard · TrueInfluenceAI</title>{FONTS}
 <style>{THEME_CSS}{NAV_CSS}
-.container{{max-width:1100px;margin:0 auto;padding:32px 24px}}
-h2{{font-family:'Playfair Display',serif;font-size:28px;color:var(--bright);margin-bottom:8px}}
-.ssub{{color:var(--muted);font-size:14px;margin-bottom:24px}}
-.dir-box{{background:#141630;border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:40px;font-size:15px;line-height:1.7}}
-.igrid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;margin-bottom:48px}}
-.icard{{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px}}
-.ih{{display:flex;justify-content:space-between;font-size:11px;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px}}
-.icard h4{{color:var(--bright);font-size:15px;margin-bottom:6px}}
-.icard p{{font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:8px}}
-.ia{{font-size:12px;color:var(--accent);font-weight:500}}
-.ggrid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:48px}}
-.gcard{{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;display:flex;gap:16px;align-items:flex-start}}
-.gscore{{font-family:'Playfair Display',serif;font-size:32px;font-weight:900;color:var(--green);min-width:50px}}
-.gcard h4{{color:var(--bright);font-size:14px;margin-bottom:4px}}
-.gcard p{{font-size:12px;color:var(--muted);line-height:1.4}}
-.rgrid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;margin-bottom:48px}}
-.rcard{{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px}}
-.rcard h4{{color:var(--bright);font-size:15px;margin:8px 0 6px}}.rcard p{{font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:8px}}
-.rimpact{{font-size:11px;color:var(--gold);font-weight:600}}
-h3{{color:var(--bright);margin-bottom:16px;font-size:18px}}
+
+/* Section headers */
+.section-head{{display:flex;align-items:center;gap:12px;margin:40px 0 20px}}
+.section-head .dot{{width:10px;height:10px;border-radius:50%}}
+.section-head h3{{margin:0;font-size:18px}}
+.section-head .count{{font-size:12px;color:var(--muted);margin-left:auto}}
+
+/* Topic cards - Layer 1 */
+.topic-grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;margin-bottom:16px}}
+.topic-card{{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;cursor:pointer;transition:all .2s;position:relative}}
+.topic-card:hover{{border-color:var(--accent);transform:translateY(-2px)}}
+.topic-card .tc-head{{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}}
+.topic-card h4{{font-size:15px;font-weight:600;color:var(--bright);margin:0}}
+.topic-card .tc-stat{{font-size:13px;font-weight:700;padding:2px 10px;border-radius:6px}}
+.topic-card .tc-reason{{font-size:13px;color:var(--text);line-height:1.5;margin-bottom:12px}}
+.topic-card .tc-vids{{font-size:11px;color:var(--muted)}}
+.topic-card .tc-expand{{font-size:11px;color:var(--accent);font-weight:600;display:flex;align-items:center;gap:4px;margin-top:8px}}
+
+/* Expanded detail - Layer 2 */
+.detail-overlay{{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(6,7,11,.9);z-index:100;overflow-y:auto;backdrop-filter:blur(8px)}}
+.detail-overlay.open{{display:block}}
+.detail-panel{{max-width:800px;margin:60px auto;padding:40px;background:var(--surface);border:1px solid var(--border);border-radius:20px;position:relative}}
+.detail-panel .close-btn{{position:absolute;top:16px;right:20px;font-size:24px;color:var(--muted);cursor:pointer;background:none;border:none;font-family:inherit}}
+.detail-panel .close-btn:hover{{color:var(--bright)}}
+.detail-panel h2{{font-size:24px;margin-bottom:8px}}
+.detail-panel .dp-stat{{font-size:14px;margin-bottom:16px}}
+.detail-panel .dp-reason{{font-size:15px;color:var(--text);line-height:1.7;margin-bottom:24px;padding:16px;background:var(--surface2);border-radius:10px;border-left:3px solid var(--accent)}}
+.detail-panel .dp-videos{{margin-bottom:24px}}
+.detail-panel .dp-videos h4{{font-size:14px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}}
+.detail-panel .vid-row{{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px}}
+.detail-panel .vid-row a{{color:var(--bright)}}
+.detail-panel .vid-row .vr-views{{color:var(--green)}}
+
+/* Action buttons */
+.action-btns{{display:flex;gap:12px;margin-top:24px}}
+.action-btn{{flex:1;padding:16px;border-radius:12px;border:1px solid var(--border);background:var(--surface2);cursor:pointer;text-align:center;transition:all .2s;text-decoration:none;color:inherit}}
+.action-btn:hover{{border-color:var(--accent);transform:translateY(-2px)}}
+.action-btn .ab-icon{{font-size:28px;margin-bottom:8px}}
+.action-btn .ab-title{{font-size:14px;font-weight:600;color:var(--bright)}}
+.action-btn .ab-desc{{font-size:12px;color:var(--muted);margin-top:4px}}
+
+/* Layer 3 panels */
+.l3-panel{{display:none;margin-top:24px;padding:24px;background:var(--surface2);border-radius:12px;border:1px solid var(--border)}}
+.l3-panel.open{{display:block}}
+.l3-panel h4{{font-size:14px;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:16px}}
+
+/* Content starter */
+.content-starter{{line-height:1.7;color:var(--text)}}
+.content-starter .cs-title{{font-size:18px;font-weight:700;color:var(--bright);margin-bottom:8px}}
+.content-starter .cs-hook{{font-size:15px;color:var(--gold);font-style:italic;margin-bottom:16px;padding:12px;background:var(--gold-soft);border-radius:8px}}
+.content-starter .cs-outline{{margin-top:12px}}
+.content-starter .cs-outline li{{margin-bottom:6px;font-size:14px}}
+.cs-loading{{color:var(--muted);font-size:14px;padding:24px;text-align:center}}
+
+/* Direction box */
+.dir-box{{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;margin-bottom:8px;font-size:15px;line-height:1.7;border-left:3px solid var(--accent)}}
+
+/* Empty state */
+.empty{{color:var(--muted);font-size:14px;font-style:italic;padding:16px 0}}
 </style></head><body>
 {_nav_html(ch, slug, 'dashboard')}
 <div class="container">
-<h2>Strategic Dashboard</h2><p class="ssub">AI-powered insights and recommendations</p>
-{'<div class="dir-box"><strong>Strategic Direction:</strong> '+direction+'</div>' if direction else ''}
-<h3>Content Insights</h3><div class="igrid">{insight_html}</div>
-<h3>Content Opportunities</h3><div class="ggrid">{gap_html}</div>
-<h3>Recommendations</h3><div class="rgrid">{rec_html}</div>
-</div></body></html>"""
+<h2>Your Dashboard</h2>
+<p class="sub">What to make next — based on what's actually working</p>
+
+{'<div class="dir-box">'+direction+'</div>' if direction else ''}
+
+<div id="dashboard-content"></div>
+</div>
+
+<!-- Detail Overlay -->
+<div class="detail-overlay" id="detailOverlay">
+<div class="detail-panel" id="detailPanel"></div>
+</div>
+
+<script>
+const CATS = {cats_json};
+const VOICE = {voice_json};
+const API_KEY = '{OPENROUTER_API_KEY}';
+const MODEL = '{OPENROUTER_MODEL_ID}';
+const CHANNEL = '{ch}';
+
+function renderDashboard() {{
+  const el = document.getElementById('dashboard-content');
+  let html = '';
+
+  // Double Down
+  if (CATS.double_down && CATS.double_down.length) {{
+    html += sectionHTML('🔥', 'Double Down', 'var(--green)', CATS.double_down, 'These topics consistently outperform. Make more.');
+  }}
+
+  // Untapped
+  if (CATS.untapped && CATS.untapped.length) {{
+    html += sectionHTML('💎', 'Untapped Opportunities', 'var(--gold)', CATS.untapped, 'One video crushed it. Your audience wants more.');
+  }}
+
+  // Resurface & Refresh
+  if (CATS.resurface && CATS.resurface.length) {{
+    html += sectionHTML('♻️', 'Resurface & Refresh', 'var(--blue)', CATS.resurface, 'Old hits ready for a 2026 update.');
+  }}
+
+  // Stop Making
+  if (CATS.stop_making && CATS.stop_making.length) {{
+    html += sectionHTML('🚫', 'Consider Dropping', 'var(--red)', CATS.stop_making.slice(0, 4), 'Consistently below average. Your audience isn\\'t here for this.');
+  }}
+
+  el.innerHTML = html;
+}}
+
+function sectionHTML(icon, title, color, items, subtitle) {{
+  let cards = '';
+  items.forEach((item, i) => {{
+    const vsColor = item.vs_channel > 0 ? 'var(--green)' : 'var(--red)';
+    const sign = item.vs_channel > 0 ? '+' : '';
+    cards += `
+      <div class="topic-card" onclick="openDetail('${{title}}', ${{i}})">
+        <div class="tc-head">
+          <h4>${{item.topic}}</h4>
+          <span class="tc-stat" style="background:${{item.vs_channel > 0 ? 'var(--green-soft)' : 'var(--red-soft)'}};color:${{vsColor}}">${{sign}}${{item.vs_channel.toFixed(0)}}%</span>
+        </div>
+        <div class="tc-reason">${{item.reason}}</div>
+        <div class="tc-vids">${{item.video_count}} video${{item.video_count !== 1 ? 's' : ''}} · ${{item.avg_views.toLocaleString()}} avg views</div>
+        <div class="tc-expand">Click to explore →</div>
+      </div>`;
+  }});
+
+  return `
+    <div class="section-head">
+      <span style="font-size:20px">${{icon}}</span>
+      <h3 style="color:${{color}}">${{title}}</h3>
+      <span class="count">${{items.length}} topic${{items.length !== 1 ? 's' : ''}}</span>
+    </div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:16px">${{subtitle}}</p>
+    <div class="topic-grid">${{cards}}</div>`;
+}}
+
+function openDetail(section, index) {{
+  let items;
+  if (section.includes('Double')) items = CATS.double_down;
+  else if (section.includes('Untapped')) items = CATS.untapped;
+  else if (section.includes('Resurface')) items = CATS.resurface;
+  else items = CATS.stop_making;
+
+  const item = items[index];
+  if (!item) return;
+
+  const vsColor = item.vs_channel > 0 ? 'var(--green)' : 'var(--red)';
+  const sign = item.vs_channel > 0 ? '+' : '';
+
+  let videoRows = '';
+  (item.videos || []).forEach(v => {{
+    videoRows += `<div class="vid-row">
+      <a href="${{v.url}}" target="_blank">${{v.title || v.video_id}}</a>
+      <span class="vr-views">${{(v.views || 0).toLocaleString()}} views</span>
+    </div>`;
+  }});
+
+  const panel = document.getElementById('detailPanel');
+  panel.innerHTML = `
+    <button class="close-btn" onclick="closeDetail()">✕</button>
+    <h2>${{item.topic}}</h2>
+    <div class="dp-stat">
+      <span style="color:${{vsColor}};font-weight:700;font-size:18px">${{sign}}${{item.vs_channel.toFixed(0)}}%</span>
+      <span style="color:var(--muted)"> vs your channel average · ${{item.video_count}} video${{item.video_count !== 1 ? 's' : ''}} · ${{item.avg_views.toLocaleString()}} avg views</span>
+    </div>
+    <div class="dp-reason">${{item.reason}}</div>
+    ${{videoRows ? '<div class="dp-videos"><h4>Videos</h4>' + videoRows + '</div>' : ''}}
+    <div class="action-btns">
+      <div class="action-btn" onclick="showStats('${{item.topic}}')">
+        <div class="ab-icon">📊</div>
+        <div class="ab-title">Show Me the Data</div>
+        <div class="ab-desc">Deep dive into the numbers</div>
+      </div>
+      <div class="action-btn" onclick="showContentStarter('${{item.topic}}')">
+        <div class="ab-icon">✍️</div>
+        <div class="ab-title">Help Me Write This</div>
+        <div class="ab-desc">Get titles, hooks & outlines in your voice</div>
+      </div>
+    </div>
+    <div class="l3-panel" id="l3Stats"></div>
+    <div class="l3-panel" id="l3Content"></div>
+  `;
+
+  document.getElementById('detailOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}}
+
+function closeDetail() {{
+  document.getElementById('detailOverlay').classList.remove('open');
+  document.body.style.overflow = '';
+}}
+
+// Close on overlay click (not panel click)
+document.getElementById('detailOverlay').addEventListener('click', function(e) {{
+  if (e.target === this) closeDetail();
+}});
+
+// Close on Escape
+document.addEventListener('keydown', function(e) {{
+  if (e.key === 'Escape') closeDetail();
+}});
+
+function showStats(topic) {{
+  const el = document.getElementById('l3Stats');
+  document.getElementById('l3Content').classList.remove('open');
+  el.classList.toggle('open');
+  if (!el.classList.contains('open')) return;
+
+  // Show extended stats from analytics data
+  el.innerHTML = `
+    <h4>📊 Deep Stats: ${{topic}}</h4>
+    <table style="width:100%;font-size:13px;border-collapse:collapse">
+      <tr style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:1px">
+        <th style="text-align:left;padding:8px 0">Metric</th>
+        <th style="text-align:right;padding:8px 0">Value</th>
+      </tr>
+      <tr><td style="padding:6px 0;border-top:1px solid var(--border)">Topic</td><td style="text-align:right;color:var(--bright)">${{topic}}</td></tr>
+      <tr><td style="padding:6px 0;border-top:1px solid var(--border)">Channel Average</td><td style="text-align:right;color:var(--muted)">Baseline</td></tr>
+      <tr><td style="padding:6px 0;border-top:1px solid var(--border)">Topic is recency-weighted</td><td style="text-align:right;color:var(--accent)">Recent = 5x weight</td></tr>
+    </table>
+    <p style="margin-top:16px;font-size:13px;color:var(--muted)">Full topic breakdown available on the <a href="/${slug}/analytics">Analytics page</a>.</p>
+  `;
+}}
+
+async function showContentStarter(topic) {{
+  const el = document.getElementById('l3Content');
+  document.getElementById('l3Stats').classList.remove('open');
+  el.classList.toggle('open');
+  if (!el.classList.contains('open')) return;
+
+  el.innerHTML = '<div class="cs-loading">✍️ Writing in ' + CHANNEL + '\\'s voice...</div>';
+
+  const voiceDesc = VOICE.tone || VOICE.description || 'Direct, practical, conversational';
+  const phrases = (VOICE.signature_phrases || []).join(', ') || 'None identified';
+
+  const prompt = `You are a content strategist helping the YouTube creator "${{CHANNEL}}".
+
+CREATOR VOICE PROFILE:
+${{JSON.stringify(VOICE, null, 2)}}
+
+The creator needs help creating content about: "${{topic}}"
+
+Generate the following IN THE CREATOR'S VOICE AND STYLE:
+1. Three compelling video title options (the kind that get clicks for this creator's audience)
+2. An opening hook (the first 15 seconds of the video - what they'd actually say on camera)
+3. A rough outline (5-7 key points to cover)
+4. One surprising angle most creators would miss
+
+Keep it practical, not generic. Sound like ${{CHANNEL}}, not like a consultant.
+
+Respond in this exact JSON format:
+{{
+  "titles": ["title1", "title2", "title3"],
+  "hook": "The opening 15 seconds...",
+  "outline": ["Point 1", "Point 2", "Point 3", "Point 4", "Point 5"],
+  "surprise_angle": "The unexpected take..."
+}}
+
+Return ONLY valid JSON.`;
+
+  try {{
+    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {{
+      method: 'POST',
+      headers: {{ 'Authorization': 'Bearer ' + API_KEY, 'Content-Type': 'application/json' }},
+      body: JSON.stringify({{
+        model: MODEL,
+        messages: [{{ role: 'user', content: prompt }}],
+        temperature: 0.5,
+        max_tokens: 1500
+      }})
+    }});
+    const d = await r.json();
+    let text = d.choices[0].message.content;
+    if (text.includes('```')) {{
+      text = text.includes('```json') ? text.split('```json')[1].split('```')[0] : text.split('```')[1].split('```')[0];
+    }}
+    const cs = JSON.parse(text.trim());
+
+    let titlesHTML = cs.titles.map((t, i) => `<div style="padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;color:var(--bright);font-weight:600">Option ${{i+1}}: ${{t}}</div>`).join('');
+
+    let outlineHTML = cs.outline.map(p => `<li>${{p}}</li>`).join('');
+
+    el.innerHTML = `
+      <div class="content-starter">
+        <h4 style="color:var(--accent);margin-bottom:16px">✍️ Content Starter: ${{topic}}</h4>
+        <div style="margin-bottom:20px">
+          <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Title Options</div>
+          ${{titlesHTML}}
+        </div>
+        <div style="margin-bottom:20px">
+          <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Opening Hook</div>
+          <div class="cs-hook">"${{cs.hook}}"</div>
+        </div>
+        <div style="margin-bottom:20px">
+          <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Outline</div>
+          <ol class="cs-outline" style="padding-left:20px">${{outlineHTML}}</ol>
+        </div>
+        <div>
+          <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Surprise Angle</div>
+          <div style="padding:12px;background:var(--accent-soft);border-radius:8px;color:var(--accent-glow);font-weight:500">${{cs.surprise_angle}}</div>
+        </div>
+      </div>
+    `;
+  }} catch (e) {{
+    el.innerHTML = '<div style="color:var(--red);padding:16px">Error generating content: ' + e.message + '</div>';
+  }}
+}}
+
+// Init
+renderDashboard();
+</script></body></html>"""
     (bp / "dashboard.html").write_text(html, encoding="utf-8")
 
 
+# ─── ANALYTICS PAGE ─────────────────────────────────────────────
 def _build_analytics(bp, data):
     ch = data["manifest"].get("channel", "Unknown")
     slug = data["slug"]
     analytics = data.get("analytics_report", {})
     timeline = analytics.get("topic_timeline", {})
     performance = analytics.get("topic_performance", {})
+    sources = data.get("sources", [])
+    source_map = {s["source_id"]: s for s in sources}
     all_topics = set(timeline.keys()) | set(performance.keys())
 
     rows = ""
     for topic in sorted(all_topics, key=lambda t: -performance.get(t,{}).get("weighted_avg_views",0)):
-        tl = timeline.get(topic,{})
-        perf = performance.get(topic,{})
-        count = tl.get("count", perf.get("video_count",0))
-        avg = perf.get("weighted_avg_views",0)
-        vs = perf.get("vs_channel_avg",0)
-        vids = tl.get("videos",[])
-        if len(vids)>=3:
-            sv = sorted(vids, key=lambda v:v.get("published",""))
-            fh = len(sv)//2; sh = len(sv)-fh
-            if sh>fh: tr,ti,tc="rising","UP","var(--green)"
-            elif fh>sh: tr,ti,tc="declining","DOWN","var(--red)"
-            else: tr,ti,tc="steady","FLAT","var(--gold)"
-        elif count==0: tr,ti,tc="dormant","ZZZ","var(--muted)"
-        else: tr,ti,tc="steady","FLAT","var(--gold)"
-        vc = "var(--green)" if vs>0 else "var(--red)" if vs<0 else "var(--muted)"
-        sign = "+" if vs>0 else ""
-        rows += f'<tr data-trend="{tr}"><td>{topic}</td><td>{count}</td><td>{avg:,}</td><td style="color:{vc}">{sign}{vs}%</td><td><span style="color:{tc}">{ti} {tr}</span></td></tr>'
+        tl = timeline.get(topic, {})
+        perf = performance.get(topic, {})
+        count = tl.get("count", perf.get("video_count", 0))
+        avg = perf.get("weighted_avg_views", 0)
+        vs = perf.get("vs_channel_avg", 0)
+        vids = tl.get("videos", [])
+
+        if len(vids) >= 3:
+            sv = sorted(vids, key=lambda v: v.get("published", ""))
+            fh = len(sv) // 2
+            sh = len(sv) - fh
+            if sh > fh: tr, ti, tc = "rising", "↑ Rising", "var(--green)"
+            elif fh > sh: tr, ti, tc = "declining", "↓ Declining", "var(--red)"
+            else: tr, ti, tc = "steady", "→ Steady", "var(--gold)"
+        elif count == 0:
+            tr, ti, tc = "dormant", "◌ Dormant", "var(--muted)"
+        else:
+            tr, ti, tc = "steady", "→ Steady", "var(--gold)"
+
+        vc = "var(--green)" if vs > 0 else "var(--red)" if vs < 0 else "var(--muted)"
+        sign = "+" if vs > 0 else ""
+
+        # Get video titles for tooltip
+        vid_titles = []
+        for v in vids[:3]:
+            vid = v.get("video_id", "")
+            s = source_map.get(vid, {})
+            vid_titles.append(s.get("title", vid)[:40])
+
+        rows += f'<tr data-trend="{tr}"><td style="color:var(--bright);font-weight:500">{topic}</td><td>{count}</td><td>{avg:,}</td><td style="color:{vc};font-weight:600">{sign}{vs}%</td><td><span style="color:{tc};font-size:12px">{ti}</span></td></tr>'
 
     html = f"""<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>{ch} Analytics -- TrueInfluenceAI</title>{FONTS}
+<title>{ch} Analytics · TrueInfluenceAI</title>{FONTS}
 <style>{THEME_CSS}{NAV_CSS}
-.container{{max-width:1100px;margin:0 auto;padding:32px 24px}}
-h2{{font-family:'Playfair Display',serif;font-size:28px;color:var(--bright);margin-bottom:8px}}
-.ssub{{color:var(--muted);font-size:14px;margin-bottom:24px}}
 table{{width:100%;border-collapse:collapse;margin-top:16px}}
-th{{text-align:left;padding:12px 16px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);border-bottom:2px solid var(--border)}}
-td{{padding:12px 16px;font-size:14px;border-bottom:1px solid rgba(28,31,46,.4)}}
-tr:hover{{background:rgba(15,17,24,.6)}}
-.fbar{{display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap}}
-.fb{{padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;font-size:12px;font-weight:500;transition:all .2s}}
-.fb:hover,.fb.active{{border-color:var(--accent);color:var(--accent);background:rgba(124,106,255,.05)}}
+th{{text-align:left;padding:14px 16px;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);border-bottom:2px solid var(--border);font-weight:600}}
+td{{padding:12px 16px;font-size:13px;border-bottom:1px solid rgba(26,28,42,.5)}}
+tr:hover{{background:rgba(99,102,241,.03)}}
+.fbar{{display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap}}
+.fb{{padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;font-size:12px;font-weight:500;transition:all .2s;font-family:inherit}}
+.fb:hover,.fb.active{{border-color:var(--accent);color:var(--accent-glow);background:var(--accent-soft)}}
+.note{{font-size:12px;color:var(--muted);margin-bottom:24px;padding:12px 16px;background:var(--surface);border-radius:8px;border:1px solid var(--border)}}
 </style></head><body>
 {_nav_html(ch, slug, 'analytics')}
 <div class="container">
-<h2>Content Analytics</h2><p class="ssub">Recency-weighted topic performance and evolution</p>
+<h2>Content Analytics</h2>
+<p class="sub">Every topic scored and weighted — recent content counts 5x more</p>
+<div class="note">💡 Views are recency-weighted. A topic that performs well in recent videos scores higher than the same views from a year ago.</div>
 <div class="fbar">
 <button class="fb active" onclick="ft('all',this)">All ({len(all_topics)})</button>
-<button class="fb" onclick="ft('rising',this)">Rising</button>
-<button class="fb" onclick="ft('declining',this)">Declining</button>
-<button class="fb" onclick="ft('steady',this)">Steady</button>
-<button class="fb" onclick="ft('dormant',this)">Dormant</button>
+<button class="fb" onclick="ft('rising',this)">↑ Rising</button>
+<button class="fb" onclick="ft('declining',this)">↓ Declining</button>
+<button class="fb" onclick="ft('steady',this)">→ Steady</button>
 </div>
-<table><thead><tr><th>Topic</th><th>Videos</th><th>Wtd Avg Views</th><th>vs Channel</th><th>Trend</th></tr></thead>
+<table><thead><tr><th>Topic</th><th>Videos</th><th>Wtd Avg Views</th><th>vs Channel Avg</th><th>Trend</th></tr></thead>
 <tbody>{rows}</tbody></table></div>
 <script>
 function ft(t,el){{document.querySelectorAll('.fb').forEach(b=>b.classList.remove('active'));el.classList.add('active');
@@ -252,6 +659,7 @@ document.querySelectorAll('tbody tr').forEach(r=>{{r.style.display=t==='all'||r.
     (bp / "analytics.html").write_text(html, encoding="utf-8")
 
 
+# ─── DISCUSS PAGE ───────────────────────────────────────────────
 def _build_discuss(bp, data):
     ch = data["manifest"].get("channel", "Unknown")
     slug = data["slug"]
@@ -259,38 +667,44 @@ def _build_discuss(bp, data):
     chunks = data.get("chunks", [])
     sources = data.get("sources", [])
 
-    src_map = json.dumps({s["source_id"]:{"title":s.get("title",""),"url":s.get("url","")} for s in sources})
-    chunks_js = json.dumps([{"id":c["chunk_id"],"vid":c["video_id"],"text":c["text"],"ts":c.get("timestamp",0),"emb":c.get("embedding",[])} for c in chunks])
+    src_map = json.dumps({s["source_id"]: {"title": s.get("title", ""), "url": s.get("url", "")} for s in sources})
+    chunks_js = json.dumps([{"id": c["chunk_id"], "vid": c["video_id"], "text": c["text"], "ts": c.get("timestamp", 0), "emb": c.get("embedding", [])} for c in chunks])
     voice_js = json.dumps(voice)
 
     html = f"""<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Discuss {ch} -- TrueInfluenceAI</title>{FONTS}
+<title>Discuss {ch} · TrueInfluenceAI</title>{FONTS}
 <style>{THEME_CSS}{NAV_CSS}
-body{{display:flex;flex-direction:column}}
-.chat-wrap{{flex:1;max-width:800px;width:100%;margin:0 auto;display:flex;flex-direction:column;padding:24px}}
-.msgs{{flex:1;overflow-y:auto;padding-bottom:16px}}
-.msg{{margin-bottom:16px;padding:16px;border-radius:12px;max-width:85%;line-height:1.6;font-size:14px}}
-.msg.user{{background:rgba(124,106,255,.12);border:1px solid rgba(124,106,255,.25);margin-left:auto;color:var(--bright)}}
+body{{display:flex;flex-direction:column;height:100vh}}
+.chat-wrap{{flex:1;max-width:760px;width:100%;margin:0 auto;display:flex;flex-direction:column;padding:24px;overflow:hidden}}
+.chat-intro{{text-align:center;padding:32px 0 16px}}
+.chat-intro h3{{font-family:'Fraunces',serif;font-size:22px;color:var(--bright);margin-bottom:8px}}
+.chat-intro p{{font-size:14px;color:var(--muted)}}
+.msgs{{flex:1;overflow-y:auto;padding-bottom:16px;scroll-behavior:smooth}}
+.msg{{margin-bottom:14px;padding:16px 18px;border-radius:14px;max-width:85%;line-height:1.6;font-size:14px}}
+.msg.user{{background:var(--accent-soft);border:1px solid rgba(99,102,241,.2);margin-left:auto;color:var(--bright)}}
 .msg.ai{{background:var(--surface);border:1px solid var(--border)}}
-.msg .refs{{margin-top:12px;padding-top:8px;border-top:1px solid var(--border);font-size:11px;color:var(--muted)}}
+.msg .refs{{margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-size:11px;color:var(--muted)}}
 .msg .refs a{{color:var(--accent)}}
-.ibar{{display:flex;gap:12px;padding:16px 0;border-top:1px solid var(--border)}}
-.ibar input{{flex:1;padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--bright);font-size:14px;outline:none;font-family:inherit}}
+.starters{{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:16px}}
+.st{{padding:8px 16px;background:var(--surface);border:1px solid var(--border);border-radius:20px;font-size:12px;color:var(--muted);cursor:pointer;transition:all .2s;font-family:inherit}}
+.st:hover{{border-color:var(--accent);color:var(--accent-glow)}}
+.ibar{{display:flex;gap:10px;padding:16px 0;border-top:1px solid var(--border);flex-shrink:0}}
+.ibar input{{flex:1;padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:12px;color:var(--bright);font-size:14px;outline:none;font-family:inherit}}
 .ibar input:focus{{border-color:var(--accent)}}
-.ibar button{{padding:14px 28px;background:var(--accent);color:#fff;border:none;border-radius:10px;font-weight:600;cursor:pointer}}
+.ibar button{{padding:14px 24px;background:var(--accent);color:#fff;border:none;border-radius:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .2s}}
 .ibar button:hover{{background:var(--accent-glow)}}
-.starters{{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}}
-.st{{padding:8px 16px;background:var(--surface);border:1px solid var(--border);border-radius:20px;font-size:12px;color:var(--muted);cursor:pointer;transition:all .2s}}
-.st:hover{{border-color:var(--accent);color:var(--accent)}}
 </style></head><body>
 {_nav_html(ch, slug, 'discuss')}
 <div class="chat-wrap">
-<div style="text-align:center;padding:24px 0;color:var(--muted);font-size:14px">Ask anything about <strong style="color:var(--bright)">{ch}</strong>'s content</div>
+<div class="chat-intro">
+<h3>Ask {ch} Anything</h3>
+<p>AI trained on their content, speaking in their voice</p>
+</div>
 <div class="starters">
 <span class="st" onclick="askQ('What topics does {ch} focus on most?')">Top topics</span>
-<span class="st" onclick="askQ('What is {ch}\\'s approach to growing an audience?')">Growth strategy</span>
 <span class="st" onclick="askQ('What advice does {ch} give to beginners?')">Beginner advice</span>
 <span class="st" onclick="askQ('How has {ch}\\'s content evolved recently?')">Content evolution</span>
+<span class="st" onclick="askQ('What\\'s {ch}\\'s take on cost of living abroad?')">Cost of living</span>
 </div>
 <div class="msgs" id="msgs"></div>
 <div class="ibar"><input id="qi" placeholder="Ask about {ch}'s content..." onkeydown="if(event.key==='Enter')askQ()"><button onclick="askQ()">Ask</button></div>
@@ -301,15 +715,11 @@ const CHUNKS={chunks_js};
 const SOURCES={src_map};
 const VOICE={voice_js};
 const API_KEY='{OPENROUTER_API_KEY}';
-const MODEL='{os.getenv("OPENROUTER_MODEL_ID","anthropic/claude-sonnet-4-20250514")}';
+const MODEL='{OPENROUTER_MODEL_ID}';
 
 function dot(a,b){{let s=0;for(let i=0;i<a.length;i++)s+=a[i]*b[i];return s}}
 function mag(a){{return Math.sqrt(a.reduce((s,v)=>s+v*v,0))}}
 function cosine(a,b){{if(!a.length||!b.length)return 0;return dot(a,b)/(mag(a)*mag(b))}}
-
-function recencyWeight(vid){{
-  const s=SOURCES[vid];if(!s)return 0.5;return 1.0;
-}}
 
 async function getEmbedding(text){{
   const r=await fetch('https://openrouter.ai/api/v1/embeddings',{{
@@ -322,8 +732,7 @@ async function getEmbedding(text){{
 function searchChunks(qEmb,k=5){{
   const scored=CHUNKS.map(c=>{{
     const sim=cosine(qEmb,c.emb);
-    const rw=recencyWeight(c.vid);
-    return{{...c,score:sim*rw}};
+    return{{...c,score:sim}};
   }});
   scored.sort((a,b)=>b.score-a.score);
   return scored.slice(0,k);
@@ -345,33 +754,52 @@ async function askQ(q){{
     const hits=searchChunks(qEmb,5);
     const context=hits.map(h=>`[Source: ${{SOURCES[h.vid]?.title||h.vid}}]\\n${{h.text}}`).join('\\n---\\n');
 
-    const sysPrompt=`You are an AI assistant that answers questions based on ${{'{ch}'}}'s content.
-Voice profile: ${{JSON.stringify(VOICE)}}
-Answer in their voice and style. Cite specific content when possible. Be helpful and concise.`;
+    const sysPrompt=`You ARE ${{'{ch}'}}. You are speaking directly to a viewer as yourself.
+
+YOUR VOICE:
+${{JSON.stringify(VOICE)}}
+
+RULES:
+- Speak as ${{'{ch}'}} in first person. Use "I", "my experience", "when I moved to...", etc.
+- Draw from ALL your knowledge as one unified expertise. Do NOT cite or reference individual videos inline. Never say "[Source: video title]" or "In my video about...". Just speak naturally from everything you know.
+- Be direct, practical, and conversational — the way you talk in your videos.
+- Use your signature phrases naturally when they fit.
+- Keep responses focused and actionable. No fluff.
+- At the END of your response, add a line break and then say something like "You might want to check out these videos for more detail:" followed by 2-3 relevant video titles. But only at the end, never inline.
+- Do NOT use bullet points or numbered lists for your main response. Talk naturally in paragraphs like you would on camera.`;
+
+    // Build the video references separately
+    const relevantVids = [];
+    const seenVids = new Set();
+    hits.forEach(h => {{
+      if (!seenVids.has(h.vid)) {{
+        seenVids.add(h.vid);
+        const s = SOURCES[h.vid];
+        if (s) relevantVids.push(s);
+      }}
+    }});
 
     const r=await fetch('https://openrouter.ai/api/v1/chat/completions',{{
       method:'POST',headers:{{'Authorization':'Bearer '+API_KEY,'Content-Type':'application/json'}},
       body:JSON.stringify({{model:MODEL,messages:[
         {{role:'system',content:sysPrompt}},
-        {{role:'user',content:`Context from ${{'{ch}'}}'s content:\\n${{context}}\\n\\nQuestion: ${{q}}`}}
-      ],temperature:0.4,max_tokens:1000}})
+        {{role:'user',content:`Here is your knowledge to draw from (do NOT cite these individually — synthesize into one natural response):\\n\\n${{context}}\\n\\nViewer question: ${{q}}`}}
+      ],temperature:0.5,max_tokens:1200}})
     }});
     const d=await r.json();
-    const answer=d.choices[0].message.content;
+    let answer=d.choices[0].message.content;
 
-    let refs='<div class="refs">Sources: ';
-    const seen=new Set();
-    hits.forEach(h=>{{
-      if(!seen.has(h.vid)){{
-        seen.add(h.vid);
-        const s=SOURCES[h.vid];
-        if(s)refs+=`<a href="${{s.url}}" target="_blank">${{s.title}}</a> | `;
-      }}
-    }});
-    refs+='</div>';
+    // Build video links footer
+    let refs = '';
+    if (relevantVids.length > 0) {{
+      refs = '<div class="refs">📺 Related videos: ';
+      relevantVids.slice(0, 3).forEach(v => {{
+        refs += `<a href="${{v.url}}" target="_blank">${{v.title}}</a> · `;
+      }});
+      refs += '</div>';
+    }}
 
-    document.getElementById('thinking').outerHTML=`<div class="msg ai">${{answer.replace(/\\n/g,'<br>')}}
-${{refs}}</div>`;
+    document.getElementById('thinking').outerHTML=`<div class="msg ai">${{answer.replace(/\\n/g,'<br>')}}${{refs}}</div>`;
   }}catch(e){{
     document.getElementById('thinking').outerHTML=`<div class="msg ai" style="color:var(--red)">Error: ${{e.message}}</div>`;
   }}
