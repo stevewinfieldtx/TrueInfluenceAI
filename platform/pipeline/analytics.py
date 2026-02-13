@@ -33,6 +33,10 @@ def run_analytics(bundle_dir):
     print("Extracting topics...")
     topic_map = _extract_topics(sources, chunks)
 
+    # Step 1.5: Cluster topics into content pillars
+    print("Clustering topics into content pillars...")
+    topic_map = _cluster_topics(topic_map)
+
     # Step 2: Build timeline
     topic_timeline = _build_timeline(topic_map, sources)
 
@@ -123,6 +127,98 @@ Example: ["Visa options for retirees", "Cost of living abroad", "Expat relations
             print(f"   Topic extraction failed for {vid}: {e}")
 
     return topic_map
+
+
+def _cluster_topics(topic_map):
+    """Cluster individual topics into 8-15 content pillars using LLM.
+    
+    Takes: {video_id: ["Da Nang affordability", "Reasons for leaving Da Nang", ...]}
+    Returns: {video_id: ["Da Nang Living", "Cost of Living", ...]} with standardized pillar names.
+    """
+    # Collect all unique topics
+    all_topics = set()
+    for topics in topic_map.values():
+        all_topics.update(topics)
+    
+    if len(all_topics) < 5:
+        return topic_map  # Too few to cluster
+    
+    topics_list = sorted(all_topics)
+    
+    prompt = f"""I have {len(topics_list)} content topics extracted from a YouTube channel's videos.
+Many of these are variations of the same theme. Group them into 8-15 CONTENT PILLARS.
+
+TOPICS:
+{chr(10).join(f'- {t}' for t in topics_list)}
+
+RULES:
+- Each pillar should be 2-4 words (short, punchy labels)
+- Every single topic MUST be assigned to exactly one pillar
+- Pillars should represent what the AUDIENCE searches for
+- Good pillars: "Cost of Living", "Vietnam Visas", "Da Nang Guide", "Retirement Planning", "Healthcare Abroad"
+- Bad pillars: "Miscellaneous", "Other Topics", "General" (too vague to be useful)
+
+Respond in this exact JSON format:
+{{
+  "pillars": {{
+    "Pillar Name": ["topic 1", "topic 2", "topic 3"],
+    "Another Pillar": ["topic 4", "topic 5"]
+  }}
+}}
+
+Return ONLY valid JSON. Every topic from the list above must appear exactly once."""
+
+    try:
+        resp = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": OPENROUTER_MODEL_ID,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.1,
+                "max_tokens": 3000,
+            },
+            timeout=60,
+        )
+        resp.raise_for_status()
+        text = resp.json()["choices"][0]["message"]["content"]
+        text = text.strip()
+        if text.startswith("```"):
+            text = text.split("```json")[-1].split("```")[0] if "```json" in text else text.split("```")[1]
+        result = json.loads(text.strip())
+        pillars = result.get("pillars", {})
+        
+        if not pillars:
+            print("   WARNING: Clustering returned empty pillars, keeping original topics")
+            return topic_map
+        
+        # Build reverse map: original_topic -> pillar_name
+        topic_to_pillar = {}
+        for pillar_name, member_topics in pillars.items():
+            for t in member_topics:
+                topic_to_pillar[t] = pillar_name
+        
+        # Remap topic_map: replace each video's topics with their pillar names
+        clustered_map = {}
+        for vid, topics in topic_map.items():
+            pillar_set = set()
+            for t in topics:
+                pillar = topic_to_pillar.get(t, t)  # Fallback to original if not mapped
+                pillar_set.add(pillar)
+            clustered_map[vid] = list(pillar_set)
+        
+        original_count = len(all_topics)
+        pillar_count = len(pillars)
+        print(f"   Clustered {original_count} topics into {pillar_count} content pillars")
+        
+        return clustered_map
+        
+    except Exception as e:
+        print(f"   Topic clustering failed: {e}. Keeping original topics.")
+        return topic_map
 
 
 def _build_timeline(topic_map, sources):
