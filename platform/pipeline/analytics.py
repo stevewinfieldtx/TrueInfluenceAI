@@ -2,6 +2,7 @@
 TrueInfluenceAI - Creator Intelligence Dashboard (STATISTICALLY ENHANCED)
 =========================================================================
 Now uses Z-Scores, Confidence Intervals, and P-Values to determine strategy.
+Cloud-ready pipeline integration.
 """
 
 import sys, os, json, time, statistics
@@ -11,7 +12,6 @@ from datetime import datetime
 import requests
 
 # --- FIX: FORCE PYTHON TO LOOK IN THE SCRIPT'S DIRECTORY ---
-# This ensures we can import improved_statistics regardless of where we run from
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 # -----------------------------------------------------------
 
@@ -20,31 +20,25 @@ try:
 except ImportError:
     print("\n❌ CRITICAL ERROR: 'improved_statistics.py' not found.")
     print(f"   Make sure 'improved_statistics.py' is in this folder: {os.path.dirname(os.path.abspath(__file__))}")
-    sys.exit(1)
+    # We don't exit here so the server doesn't crash on import, but analysis will fail later if not fixed.
 
 from dotenv import load_dotenv
-# Load .env from multiple potential locations
-load_dotenv(Path(r"C:\Users\steve\Documents\.env"))
-load_dotenv(Path(r"C:\Users\steve\Documents\TruePlatformAI\.env"))
+load_dotenv()
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
-ANALYSIS_MODEL = "google/gemini-2.5-flash-lite:online"
-# Point to the bundles directory (Up two levels from pipeline, then into bundles)
-BUNDLE_DIR = Path(r"C:\Users\steve\Documents\TrueInfluenceAI\bundles")
+ANALYSIS_MODEL = os.getenv("OPENROUTER_MODEL_ID", "google/gemini-2.5-flash-lite:online")
 
-def find_latest_bundle():
-    if not BUNDLE_DIR.exists():
-        return None
-    bundles = sorted(BUNDLE_DIR.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
-    for b in bundles:
-        if (b / 'ready.flag').exists(): return b
-    return None
-
-def load_bundle(bundle_path):
-    bundle_path = Path(bundle_path)
+def load_bundle_data(bundle_dir):
+    """Load bundle data helper."""
+    bundle_path = Path(bundle_dir)
     with open(bundle_path / 'manifest.json', encoding='utf-8') as f: manifest = json.load(f)
     with open(bundle_path / 'sources.json', encoding='utf-8') as f: sources = json.load(f)
-    with open(bundle_path / 'chunks.json', encoding='utf-8') as f: chunks = json.load(f)
+    
+    # Handle chunks optionally if they exist (though analytics needs them)
+    chunks = []
+    if (bundle_path / 'chunks.json').exists():
+        with open(bundle_path / 'chunks.json', encoding='utf-8') as f: chunks = json.load(f)
+        
     return {
         'manifest': manifest,
         'sources': {s['source_id']: s for s in sources},
@@ -70,7 +64,7 @@ def extract_topics(bundle):
     all_topics = {}
     batch_size = 10
     
-    # Check if we already have topics in a previous run to save money
+    # Check if we already have topics to save money/time
     prev_report = bundle['bundle_path'] / 'analytics_report.json'
     if prev_report.exists():
         try:
@@ -148,8 +142,6 @@ def perform_statistical_analysis(video_topics, bundle):
     print("\n📊 STATISTICAL CATEGORIZATION:")
     for cat, items in categories.items():
         print(f"  {cat.upper().replace('_', ' ')}: {len(items)} topics")
-        for item in items[:3]:
-            print(f"    - {item['topic']} (Z={item['z_score']:.2f}, Conf={item['confidence_level']})")
             
     return categories, topic_prep
 
@@ -190,11 +182,11 @@ Based ONLY on this data (do not hallucinate):
         return f"Strategy generation failed: {e}"
 
 def save_report(bundle, video_topics, categories, recommendations, topic_prep):
-    # Flatten stats for the dashboard
+    # Flatten stats for the dashboard legacy support
     flat_stats = {}
     for cat, items in categories.items():
         for item in items:
-            flat_stats[item['topic']] = item['avg_views'] # Backward compatibility
+            flat_stats[item['topic']] = item['avg_views']
             
     # Timeline data for dashboard (reconstruct from topic_prep)
     timeline_data = {}
@@ -216,26 +208,43 @@ def save_report(bundle, video_topics, categories, recommendations, topic_prep):
     with open(report_path, 'w', encoding='utf-8') as f: json.dump(report, f, indent=2)
     print(f"\n📄 Report saved: {report_path}")
 
-def main():
-    if len(sys.argv) > 1:
-        bp = Path(sys.argv[1])
-        if not bp.is_absolute(): bp = BUNDLE_DIR / bp
-    else: bp = find_latest_bundle()
+# --- THE KEY FUNCTION YOUR PIPELINE NEEDS ---
+def run_analytics(bundle_dir):
+    """
+    Main entry point for the pipeline.
+    Orchestrates the entire statistical analysis flow.
+    """
+    print(f"📦 Starting Analytics for: {bundle_dir}")
+    try:
+        bundle = load_bundle_data(bundle_dir)
+        
+        # 1. Extract Topics
+        video_topics = extract_topics(bundle)
+        if not video_topics:
+            print("❌ No topics extracted. Aborting.")
+            return
+        
+        # 2. Statistical Analysis
+        categories, topic_prep = perform_statistical_analysis(video_topics, bundle)
+        if not categories:
+            print("❌ Statistical analysis failed (likely no views data).")
+            return
+            
+        # 3. Generate Strategy
+        recs = generate_strategic_recommendations(categories, bundle)
+        
+        # 4. Save
+        save_report(bundle, video_topics, categories, recs, topic_prep)
+        print("✅ Analytics Complete.")
+        
+    except Exception as e:
+        print(f"❌ Analytics Pipeline Failed: {e}")
+        import traceback
+        traceback.print_exc()
 
-    if not bp or not bp.exists():
-        print(f"❌ No bundle found in {BUNDLE_DIR}"); sys.exit(1)
-
-    print(f"📦 Loading: {bp.name}")
-    bundle = load_bundle(bp)
-    
-    video_topics = extract_topics(bundle)
-    if not video_topics: sys.exit(1)
-    
-    categories, topic_prep = perform_statistical_analysis(video_topics, bundle)
-    if not categories: sys.exit(1)
-    
-    recs = generate_strategic_recommendations(categories, bundle)
-    save_report(bundle, video_topics, categories, recs, topic_prep)
-
+# Allow standalone execution
 if __name__ == '__main__':
-    main()
+    if len(sys.argv) > 1:
+        run_analytics(sys.argv[1])
+    else:
+        print("Usage: python analytics.py <bundle_dir>")
