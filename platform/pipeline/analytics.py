@@ -5,24 +5,36 @@ Now uses Z-Scores, Confidence Intervals, and P-Values to determine strategy.
 """
 
 import sys, os, json, time, statistics
-import numpy as np
-import requests
 from pathlib import Path
 from collections import Counter, defaultdict
 from datetime import datetime
+import requests
 
-# Import the new statistical engine
-from improved_statistics import StatisticalAnalyzer, TopicCategorizer
+# --- FIX: FORCE PYTHON TO LOOK IN THE SCRIPT'S DIRECTORY ---
+# This ensures we can import improved_statistics regardless of where we run from
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# -----------------------------------------------------------
+
+try:
+    from improved_statistics import StatisticalAnalyzer, TopicCategorizer
+except ImportError:
+    print("\n❌ CRITICAL ERROR: 'improved_statistics.py' not found.")
+    print(f"   Make sure 'improved_statistics.py' is in this folder: {os.path.dirname(os.path.abspath(__file__))}")
+    sys.exit(1)
 
 from dotenv import load_dotenv
+# Load .env from multiple potential locations
 load_dotenv(Path(r"C:\Users\steve\Documents\.env"))
 load_dotenv(Path(r"C:\Users\steve\Documents\TruePlatformAI\.env"))
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 ANALYSIS_MODEL = "google/gemini-2.5-flash-lite:online"
+# Point to the bundles directory (Up two levels from pipeline, then into bundles)
 BUNDLE_DIR = Path(r"C:\Users\steve\Documents\TrueInfluenceAI\bundles")
 
 def find_latest_bundle():
+    if not BUNDLE_DIR.exists():
+        return None
     bundles = sorted(BUNDLE_DIR.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
     for b in bundles:
         if (b / 'ready.flag').exists(): return b
@@ -30,9 +42,9 @@ def find_latest_bundle():
 
 def load_bundle(bundle_path):
     bundle_path = Path(bundle_path)
-    with open(bundle_path / 'manifest.json') as f: manifest = json.load(f)
-    with open(bundle_path / 'sources.json') as f: sources = json.load(f)
-    with open(bundle_path / 'chunks.json') as f: chunks = json.load(f)
+    with open(bundle_path / 'manifest.json', encoding='utf-8') as f: manifest = json.load(f)
+    with open(bundle_path / 'sources.json', encoding='utf-8') as f: sources = json.load(f)
+    with open(bundle_path / 'chunks.json', encoding='utf-8') as f: chunks = json.load(f)
     return {
         'manifest': manifest,
         'sources': {s['source_id']: s for s in sources},
@@ -62,7 +74,7 @@ def extract_topics(bundle):
     prev_report = bundle['bundle_path'] / 'analytics_report.json'
     if prev_report.exists():
         try:
-            with open(prev_report) as f:
+            with open(prev_report, encoding='utf-8') as f:
                 old_data = json.load(f)
                 if old_data.get('video_topics'):
                     print("  ♻️  Loaded existing topics from previous run.")
@@ -111,7 +123,6 @@ def perform_statistical_analysis(video_topics, bundle):
     categorizer = TopicCategorizer(analyzer)
     
     # 2. Prepare Data for Categorizer
-    # We need: topic -> {views: [], dates: [], videos: []}
     topic_prep = defaultdict(lambda: {'views': [], 'dates': [], 'videos': []})
     
     for vid, topics in video_topics.items():
@@ -195,14 +206,14 @@ def save_report(bundle, video_topics, categories, recommendations, topic_prep):
         'generated': time.strftime('%Y-%m-%dT%H:%M:%S'),
         'video_topics': video_topics,
         'topic_frequency': {t: len(d['views']) for t, d in topic_prep.items()},
-        'topic_performance': flat_stats, # For legacy dashboard compat
+        'topic_performance': flat_stats, 
         'topic_categories': categories,  # NEW RICH DATA
         'topic_timeline': timeline_data,
         'recommendations': recommendations,
     }
 
     report_path = bundle['bundle_path'] / 'analytics_report.json'
-    with open(report_path, 'w') as f: json.dump(report, f, indent=2)
+    with open(report_path, 'w', encoding='utf-8') as f: json.dump(report, f, indent=2)
     print(f"\n📄 Report saved: {report_path}")
 
 def main():
@@ -212,7 +223,7 @@ def main():
     else: bp = find_latest_bundle()
 
     if not bp or not bp.exists():
-        print("❌ No bundle found."); sys.exit(1)
+        print(f"❌ No bundle found in {BUNDLE_DIR}"); sys.exit(1)
 
     print(f"📦 Loading: {bp.name}")
     bundle = load_bundle(bp)
