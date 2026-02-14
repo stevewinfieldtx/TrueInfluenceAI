@@ -78,30 +78,25 @@ def _load_bundle(bp):
     return data
 
 
-# ─── Categorize Topics (Improved Statistics) ───────────────────
+# ─── Categorize Topics (Fixed) ──────────────────────────────────
 def _categorize_topics(data):
-    """Analyze topics using statistically grounded methods.
-    
-    Drop-in replacement using improved_statistics module for:
-    - Z-score based classification
-    - Confidence intervals
-    - Coefficient of Variation for consistency
-    - Bayesian smoothing for small samples
-    - IQR outlier detection
     """
-    try:
-        from pipeline.improved_statistics import improved_categorize_topics
-        return improved_categorize_topics(data)
-    except ImportError:
-        try:
-            from improved_statistics import improved_categorize_topics
-            return improved_categorize_topics(data)
-        except ImportError:
-            print("WARNING: improved_statistics not found, using basic categorization")
-            return _categorize_topics_basic(data)
-    except Exception as e:
-        print(f"WARNING: improved categorization failed ({e}); using basic categorization")
-        return _categorize_topics_basic(data)
+    Retrieves statistical categories. 
+    Prioritizes the pre-calculated report from analytics.py.
+    """
+    # 1. TRY PRE-CALCULATED REPORT (The Happy Path)
+    report = data.get("analytics_report", {})
+    if report.get("topic_categories"):
+        # Validate it has at least some data
+        cats = report["topic_categories"]
+        total = sum(len(cats.get(k, [])) for k in cats)
+        if total > 0:
+            print(f"   Using {total} pre-calculated statistical topics from report.")
+            return cats
+
+    # 2. FALLBACK: Basic Categorization (if analytics.py hasn't run or failed)
+    print("   WARNING: No pre-calculated stats found. Running basic fallback...")
+    return _categorize_topics_basic(data)
 
 
 def _categorize_topics_basic(data):
@@ -113,11 +108,12 @@ def _categorize_topics_basic(data):
     sources = data.get("sources", [])
     source_map = {s["source_id"]: s for s in sources}
     channel_avg = data.get("channel_metrics", {}).get("channel_avg_views", 0)
+    
     if not channel_avg:
         vv = [s.get("views", 0) for s in sources if s.get("views", 0) > 0]
         channel_avg = int(sum(vv) / len(vv)) if vv else 1
 
-    # Legacy support: old reports use {topic: int} for performance.
+    # Legacy support: normalize old reports
     if performance and isinstance(next(iter(performance.values())), (int, float)):
         normalized = {}
         for topic, avg in performance.items():
@@ -140,18 +136,20 @@ def _categorize_topics_basic(data):
         tl = timeline.get(topic, {})
         videos = tl.get("videos", [])
 
+        # Reconstruct video details if missing
         video_details = []
-        for v in videos:
-            vid = v.get("video_id", "")
-            s = source_map.get(vid, {})
-            video_details.append({
-                "video_id": vid,
-                "title": s.get("title", v.get("title", "")),
-                "views": s.get("views", 0),
-                "published": v.get("published", s.get("published_text", "")),
-                "url": s.get("url", f"https://www.youtube.com/watch?v={vid}"),
-            })
-
+        if videos:
+            for v in videos:
+                vid = v.get("video_id", "")
+                s = source_map.get(vid, {})
+                video_details.append({
+                    "video_id": vid,
+                    "title": s.get("title", v.get("title", "")),
+                    "views": s.get("views", 0),
+                    "published": v.get("published", s.get("published_text", "")),
+                    "url": s.get("url", f"https://www.youtube.com/watch?v={vid}"),
+                })
+        
         entry = {"topic": topic, "vs_channel": vs, "avg_views": avg_views,
                  "video_count": count, "videos": video_details}
 
@@ -168,26 +166,11 @@ def _categorize_topics_basic(data):
             entry["reason"] = f"{count} videos at {avg_views:,.0f} avg views ({vs:+.0f}% vs avg). Mixed results worth testing." 
             resurface.append(entry)
 
-    # Guarantee non-empty dashboard sections when data exists.
-    if not (double_down or untapped or resurface or stop_making) and performance:
-        seed = sorted(performance.items(), key=lambda x: -x[1].get("weighted_avg_views", 0))[:6]
-        for topic, perf in seed:
-            resurface.append({
-                "topic": topic,
-                "vs_channel": perf.get("vs_channel_avg", 0),
-                "avg_views": perf.get("weighted_avg_views", 0),
-                "video_count": perf.get("video_count", timeline.get(topic, {}).get("count", 0)),
-                "videos": timeline.get(topic, {}).get("videos", []),
-                "reason": "Baseline recommendation: this topic has historical data and should be tested with a fresh angle.",
-            })
-
     return {
         "double_down": double_down[:6], "untapped": untapped[:6],
         "resurface": resurface[:6], "stop_making": stop_making[:6],
         "investigate": [],
     }
-
-
 
 
 # ─── Build All Pages ───────────────────────────────────────────
@@ -196,7 +179,10 @@ def build_all_pages(bundle_dir, slug):
     bundle_dir = Path(bundle_dir)
     data = _load_bundle(bundle_dir)
     data["slug"] = slug
+    
+    # Run categorization (Prioritizes report JSON, falls back to basic)
     data["categories"] = _categorize_topics(data)
+    
     print(f"Building pages for {slug}...")
     _build_index(bundle_dir, data)
     _build_dashboard(bundle_dir, data)
@@ -213,17 +199,18 @@ def _build_index(bp, data):
     v = data.get("voice_profile", {})
     tone = v.get("tone", "")
     tv = data["manifest"].get("total_videos", 0)
-    tc = data["manifest"].get("total_chunks", 0)
     av = m.get("channel_avg_views", 0)
     tvw = m.get("total_views", 0)
-    topics = data.get("analytics_report", {}).get("total_topics", 0)
+    
+    # Fix: Ensure we have a count even if report is missing
+    topics = data.get("analytics_report", {}).get("topic_frequency", {})
+    topic_count = len(topics) if isinstance(topics, dict) else 0
+    
     cats = data.get("categories", {})
     base = f"/c/{slug}"
 
-    # Quick wins summary
     dd_count = len(cats.get("double_down", []))
     ut_count = len(cats.get("untapped", []))
-    rs_count = len(cats.get("resurface", []))
 
     html = f"""<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>{ch} · TrueInfluenceAI</title>{FONTS}
@@ -255,7 +242,7 @@ def _build_index(bp, data):
 <div class="stat"><div class="n">{tv}</div><div class="l">Videos</div></div>
 <div class="stat"><div class="n">{av:,}</div><div class="l">Avg Views</div></div>
 <div class="stat"><div class="n">{tvw:,}</div><div class="l">Total Views</div></div>
-<div class="stat"><div class="n">{topics}</div><div class="l">Topics</div></div>
+<div class="stat"><div class="n">{topic_count}</div><div class="l">Topics</div></div>
 </div>
 {'<div class="voice"><div class="vl">Voice Profile</div><div class="vt">'+tone+'</div></div>' if tone else ''}
 </div>
@@ -263,7 +250,7 @@ def _build_index(bp, data):
 <a class="card" href="{base}/dashboard"><div class="icon">🎯</div><h3>Dashboard</h3><p>What to make next, what to stop, and hidden gems to resurface.</p>
 <span class="badge" style="background:var(--green-soft);color:var(--green)">{ut_count + dd_count} opportunities</span></a>
 <a class="card" href="{base}/analytics"><div class="icon">📊</div><h3>Analytics</h3><p>Every topic scored against your channel average with trend data.</p>
-<span class="badge" style="background:var(--accent-soft);color:var(--accent-glow)">{topics} topics tracked</span></a>
+<span class="badge" style="background:var(--accent-soft);color:var(--accent-glow)">{topic_count} topics tracked</span></a>
 <a class="card" href="{base}/discuss"><div class="icon">💬</div><h3>Discuss</h3><p>Chat with AI trained on {ch}'s content and voice.</p>
 <span class="badge" style="background:var(--gold-soft);color:var(--gold)">AI-Powered</span></a>
 </div>
@@ -272,7 +259,7 @@ def _build_index(bp, data):
     (bp / "index.html").write_text(html, encoding="utf-8")
 
 
-# ─── DASHBOARD PAGE (The Big One) ──────────────────────────────
+# ─── DASHBOARD PAGE ─────────────────────────────────────────────
 def _build_dashboard(bp, data):
     ch = data["manifest"].get("channel", "Unknown")
     slug = data["slug"]
@@ -286,7 +273,9 @@ def _build_dashboard(bp, data):
     # Encode data for JavaScript
     cats_json = json.dumps(cats, ensure_ascii=False)
     voice_json = json.dumps(voice, ensure_ascii=False)
-    future_json = json.dumps(future_suggestions[:8], ensure_ascii=False)
+    # Fix: Ensure future_suggestions is a list before slicing
+    future_list = future_suggestions if isinstance(future_suggestions, list) else []
+    future_json = json.dumps(future_list[:8], ensure_ascii=False)
 
     html = f"""<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>{ch} Dashboard · TrueInfluenceAI</title>{FONTS}
@@ -380,7 +369,6 @@ def _build_dashboard(bp, data):
 <div id="dashboard-content"></div>
 </div>
 
-<!-- Detail Overlay -->
 <div class="detail-overlay" id="detailOverlay">
 <div class="detail-panel" id="detailPanel"></div>
 </div>
@@ -427,37 +415,10 @@ function renderDashboard() {{
   }}
 
   if (!html || html.trim().length === 0) {{
-    el.innerHTML = '<div class="empty">No categorized topics were generated yet. Re-run analytics, or use AI Story Starter / Full Content Writer above.</div>';
+    el.innerHTML = '<div class="empty">No categorized topics found. Please run "python analytics.py" to generate the report first.</div>';
   }} else {{
     el.innerHTML = html;
   }}
-}}
-
-function renderFutureIdeas() {{
-  const el = document.getElementById('futureIdeas');
-  if (!FUTURE || !FUTURE.length) {{
-    el.innerHTML = '';
-    return;
-  }}
-
-  const cards = FUTURE.map(s => `
-    <div class="future-card">
-      <div class="fc-top">
-        <div class="fc-topic">${{s.topic}}</div>
-        <div class="fc-score">Score ${{(s.opportunity_score || 0).toFixed(1)}}</div>
-      </div>
-      <div class="fc-meta">${{(s.category || 'education')}} · ${{(s.trend || 'steady')}} · ${{(s.avg_engagement_rate || 0).toFixed(2)}}% engagement</div>
-      <div class="fc-idea">${{(s.idea_angles && s.idea_angles[0]) || 'Create a fresh angle based on this topic\'s recent audience response.'}}</div>
-    </div>
-  `).join('');
-
-  el.innerHTML = `
-    <div class="future-wrap">
-      <h3>🚀 Recommended Future Content</h3>
-      <p class="sub" style="margin:0;color:var(--muted)">Ranked using historical topic performance + follower engagement signals.</p>
-      <div class="future-grid">${{cards}}</div>
-    </div>
-  `;
 }}
 
 function renderFutureIdeas() {{
@@ -874,13 +835,6 @@ def _build_analytics(bp, data):
 
         vc = "var(--green)" if vs > 0 else "var(--red)" if vs < 0 else "var(--muted)"
         sign = "+" if vs > 0 else ""
-
-        # Get video titles for tooltip
-        vid_titles = []
-        for v in vids[:3]:
-            vid = v.get("video_id", "")
-            s = source_map.get(vid, {})
-            vid_titles.append(s.get("title", vid)[:40])
 
         rows += f'<tr data-trend="{tr}"><td style="color:var(--bright);font-weight:500">{topic}</td><td>{count}</td><td>{avg:,}</td><td style="color:{vc};font-weight:600">{sign}{vs}%</td><td><span style="color:{tc};font-size:12px">{ti}</span></td></tr>'
 
