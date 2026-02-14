@@ -43,6 +43,12 @@ def run_analytics(bundle_dir):
     # Step 3: Performance analysis (recency-weighted)
     topic_performance = _analyze_performance(topic_map, sources, metrics)
 
+    # Step 3.5: Categorize topics + suggest future content based on engagement
+    content_categories = _categorize_content_topics(topic_map, topic_performance, topic_timeline)
+    future_content_suggestions = _build_future_content_suggestions(
+        topic_map, sources, topic_performance, topic_timeline, content_categories
+    )
+
     # Step 4: Generate recommendations
     print("Generating recommendations...")
     recommendations = _generate_recommendations(
@@ -56,6 +62,8 @@ def run_analytics(bundle_dir):
         "topic_map": topic_map,
         "topic_timeline": topic_timeline,
         "topic_performance": topic_performance,
+        "content_categories": content_categories,
+        "future_content_suggestions": future_content_suggestions,
         "recommendations": recommendations,
         "total_topics": len(set(t for topics in topic_map.values() for t in topics)),
     }
@@ -375,3 +383,105 @@ Return ONLY valid JSON."""
     except Exception as e:
         print(f"Recommendations failed: {e}")
         return {"recommendations": [], "error": str(e)}
+
+
+def _categorize_content_topics(topic_map, performance, timeline):
+    """Assign each topic to a strategy-ready category for dashboard filtering."""
+    keyword_map = {
+        "education": ["how to", "guide", "tutorial", "framework", "strategy", "tips", "lesson"],
+        "mindset": ["mindset", "belief", "confidence", "motivation", "identity", "discipline"],
+        "growth": ["growth", "audience", "subscribers", "algorithm", "reach", "seo", "viral"],
+        "monetization": ["monet", "revenue", "sales", "income", "offer", "pricing", "launch"],
+        "community": ["community", "comment", "q&a", "behind the scenes", "story", "personal"],
+        "operations": ["systems", "workflow", "tools", "automation", "process", "team", "productivity"],
+    }
+
+    categories = {}
+    for topic in set(t for ts in topic_map.values() for t in ts):
+        lower = topic.lower()
+        matched = "education"
+        for cat, words in keyword_map.items():
+            if any(w in lower for w in words):
+                matched = cat
+                break
+
+        perf = performance.get(topic, {})
+        timeline_entry = timeline.get(topic, {})
+        recency_bias = 1 if timeline_entry.get("count", 0) >= 3 else 0
+
+        categories[topic] = {
+            "category": matched,
+            "video_count": perf.get("video_count", timeline_entry.get("count", 0)),
+            "weighted_avg_views": perf.get("weighted_avg_views", 0),
+            "vs_channel_avg": perf.get("vs_channel_avg", 0),
+            "momentum_flag": "hot" if perf.get("vs_channel_avg", 0) > 20 and recency_bias else "stable",
+        }
+
+    return categories
+
+
+def _build_future_content_suggestions(topic_map, sources, performance, timeline, categories):
+    """Generate deterministic, actionable future content ideas using engagement + historical performance."""
+    source_map = {s["source_id"]: s for s in sources}
+    topic_videos = defaultdict(list)
+
+    for vid, topics in topic_map.items():
+        src = source_map.get(vid, {})
+        views = src.get("views", 0)
+        likes = src.get("likes", 0)
+        comments = src.get("comments", 0)
+        engagement = ((likes + comments) / views * 100) if views else 0
+        for topic in topics:
+            topic_videos[topic].append({
+                "video_id": vid,
+                "title": src.get("title", ""),
+                "views": views,
+                "engagement": engagement,
+            })
+
+    suggestions = []
+    for topic, vids in topic_videos.items():
+        if not vids:
+            continue
+
+        avg_engagement = sum(v["engagement"] for v in vids) / len(vids)
+        perf = performance.get(topic, {})
+        avg_views = perf.get("weighted_avg_views", 0)
+        vs_channel = perf.get("vs_channel_avg", 0)
+        count = perf.get("video_count", len(vids))
+
+        trend = "steady"
+        tl = timeline.get(topic, {})
+        if tl.get("count", 0) >= 3:
+            videos = sorted(tl.get("videos", []), key=lambda v: v.get("published", ""))
+            split = len(videos) // 2
+            if len(videos) - split > split:
+                trend = "rising"
+            elif split > len(videos) - split:
+                trend = "declining"
+
+        opportunity_score = round((vs_channel * 0.6) + (avg_engagement * 8) + (8 if trend == "rising" else 0), 1)
+        if count >= 2 and (vs_channel > 5 or avg_engagement > 2.0):
+            top_titles = sorted(vids, key=lambda v: (v["engagement"], v["views"]), reverse=True)[:2]
+            suggestions.append({
+                "topic": topic,
+                "category": categories.get(topic, {}).get("category", "education"),
+                "trend": trend,
+                "video_count": count,
+                "weighted_avg_views": avg_views,
+                "avg_engagement_rate": round(avg_engagement, 2),
+                "opportunity_score": opportunity_score,
+                "why_now": (
+                    f"{topic} is {vs_channel:+.1f}% vs channel average with {avg_engagement:.2f}% engagement. "
+                    f"Historical pattern is {trend}."
+                ),
+                "idea_angles": [
+                    f"Advanced {topic} mistakes your audience still makes",
+                    f"{topic}: what changed this year and what to do now",
+                    f"Reacting to audience questions about {topic}",
+                ],
+                "proven_examples": [t["title"] for t in top_titles if t.get("title")],
+            })
+
+    suggestions.sort(key=lambda x: x["opportunity_score"], reverse=True)
+    return suggestions[:12]
