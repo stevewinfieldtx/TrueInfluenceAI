@@ -87,11 +87,10 @@ def _categorize_topics(data):
     # 1. TRY PRE-CALCULATED REPORT (The Happy Path)
     report = data.get("analytics_report", {})
     if report.get("topic_categories"):
-        # Validate it has at least some data
         cats = report["topic_categories"]
-        total = sum(len(cats.get(k, [])) for k in cats)
-        if total > 0:
-            print(f"   Using {total} pre-calculated statistical topics from report.")
+        # Basic validation: check if any category has items
+        if any(len(cats.get(k, [])) > 0 for k in cats):
+            print(f"   Using pre-calculated statistical topics from report.")
             return cats
 
     # 2. FALLBACK: Basic Categorization (if analytics.py hasn't run or failed)
@@ -165,7 +164,8 @@ def _categorize_topics_basic(data):
         elif count >= 2 and -40 <= vs <= 20:
             entry["reason"] = f"{count} videos at {avg_views:,.0f} avg views ({vs:+.0f}% vs avg). Mixed results worth testing." 
             resurface.append(entry)
-
+    
+    # Ensure fallback returns valid structure even if empty
     return {
         "double_down": double_down[:6], "untapped": untapped[:6],
         "resurface": resurface[:6], "stop_making": stop_making[:6],
