@@ -99,21 +99,43 @@ def _categorize_topics(data):
         except ImportError:
             print("WARNING: improved_statistics not found, using basic categorization")
             return _categorize_topics_basic(data)
+    except Exception as e:
+        print(f"WARNING: improved categorization failed ({e}); using basic categorization")
+        return _categorize_topics_basic(data)
 
 
 def _categorize_topics_basic(data):
-    """Basic fallback categorization if improved_statistics is not available."""
+    """Basic fallback categorization with compatibility for multiple analytics schemas."""
     analytics = data.get("analytics_report", {})
     performance = analytics.get("topic_performance", {})
     timeline = analytics.get("topic_timeline", {})
+    topic_freq = analytics.get("topic_frequency", {})
     sources = data.get("sources", [])
     source_map = {s["source_id"]: s for s in sources}
+    channel_avg = data.get("channel_metrics", {}).get("channel_avg_views", 0)
+    if not channel_avg:
+        vv = [s.get("views", 0) for s in sources if s.get("views", 0) > 0]
+        channel_avg = int(sum(vv) / len(vv)) if vv else 1
+
+    # Legacy support: old reports use {topic: int} for performance.
+    if performance and isinstance(next(iter(performance.values())), (int, float)):
+        normalized = {}
+        for topic, avg in performance.items():
+            avg = int(avg or 0)
+            vs = round(((avg / channel_avg) - 1) * 100, 1) if channel_avg else 0
+            count = int(topic_freq.get(topic, timeline.get(topic, {}).get("count", 0)) or 0)
+            normalized[topic] = {
+                "weighted_avg_views": avg,
+                "video_count": count,
+                "vs_channel_avg": vs,
+            }
+        performance = normalized
 
     double_down, untapped, resurface, stop_making = [], [], [], []
 
     for topic, perf in sorted(performance.items(), key=lambda x: -x[1].get("weighted_avg_views", 0)):
         vs = perf.get("vs_channel_avg", 0)
-        count = perf.get("video_count", 0)
+        count = perf.get("video_count", timeline.get(topic, {}).get("count", 0))
         avg_views = perf.get("weighted_avg_views", 0)
         tl = timeline.get(topic, {})
         videos = tl.get("videos", [])
@@ -139,9 +161,25 @@ def _categorize_topics_basic(data):
         elif count >= 2 and vs > 20:
             entry["reason"] = f"{count} videos averaging {avg_views:,.0f} views ({vs:+.0f}% above avg)."
             double_down.append(entry)
-        elif vs < -40:
+        elif count >= 2 and vs < -40:
             entry["reason"] = f"{avg_views:,.0f} avg views — {abs(vs):.0f}% below average."
             stop_making.append(entry)
+        elif count >= 2 and -40 <= vs <= 20:
+            entry["reason"] = f"{count} videos at {avg_views:,.0f} avg views ({vs:+.0f}% vs avg). Mixed results worth testing." 
+            resurface.append(entry)
+
+    # Guarantee non-empty dashboard sections when data exists.
+    if not (double_down or untapped or resurface or stop_making) and performance:
+        seed = sorted(performance.items(), key=lambda x: -x[1].get("weighted_avg_views", 0))[:6]
+        for topic, perf in seed:
+            resurface.append({
+                "topic": topic,
+                "vs_channel": perf.get("vs_channel_avg", 0),
+                "avg_views": perf.get("weighted_avg_views", 0),
+                "video_count": perf.get("video_count", timeline.get(topic, {}).get("count", 0)),
+                "videos": timeline.get(topic, {}).get("videos", []),
+                "reason": "Baseline recommendation: this topic has historical data and should be tested with a fresh angle.",
+            })
 
     return {
         "double_down": double_down[:6], "untapped": untapped[:6],
@@ -240,12 +278,15 @@ def _build_dashboard(bp, data):
     slug = data["slug"]
     cats = data.get("categories", {})
     insights_data = data.get("insights", {})
+    analytics_data = data.get("analytics_report", {})
     direction = insights_data.get("strategic_direction", "")
     voice = data.get("voice_profile", {})
+    future_suggestions = analytics_data.get("future_content_suggestions", [])
 
     # Encode data for JavaScript
     cats_json = json.dumps(cats, ensure_ascii=False)
     voice_json = json.dumps(voice, ensure_ascii=False)
+    future_json = json.dumps(future_suggestions[:8], ensure_ascii=False)
 
     html = f"""<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>{ch} Dashboard · TrueInfluenceAI</title>{FONTS}
@@ -309,6 +350,18 @@ def _build_dashboard(bp, data):
 
 /* Empty state */
 .empty{{color:var(--muted);font-size:14px;font-style:italic;padding:16px 0}}
+.future-wrap{{margin:18px 0 6px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px}}
+.future-wrap h3{{margin:0 0 6px;font-size:16px}}
+.future-grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;margin-top:12px}}
+.future-card{{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px}}
+.future-card .fc-top{{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}}
+.future-card .fc-topic{{font-size:13px;color:var(--bright);font-weight:600}}
+.future-card .fc-score{{font-size:11px;color:var(--accent-glow);font-weight:700}}
+.future-card .fc-meta{{font-size:11px;color:var(--muted);margin-bottom:6px}}
+.future-card .fc-idea{{font-size:12px;color:var(--text);line-height:1.4}}
+.quick-actions{{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 20px}}
+.qa-btn{{padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--bright);font-size:12px;cursor:pointer;font-family:inherit}}
+.qa-btn:hover{{border-color:var(--accent);color:var(--accent-glow)}}
 </style></head><body>
 {_nav_html(ch, slug, 'dashboard')}
 <div class="container">
@@ -316,6 +369,13 @@ def _build_dashboard(bp, data):
 <p class="sub">What to make next — based on what's actually working</p>
 
 {'<div class="dir-box">'+direction+'</div>' if direction else ''}
+
+<div class="quick-actions">
+  <button class="qa-btn" onclick="quickGenerate('story')">🧠 AI Story Starter</button>
+  <button class="qa-btn" onclick="quickGenerate('full')">📝 AI Full Content Writer</button>
+</div>
+
+<div id="futureIdeas"></div>
 
 <div id="dashboard-content"></div>
 </div>
@@ -325,9 +385,14 @@ def _build_dashboard(bp, data):
 <div class="detail-panel" id="detailPanel"></div>
 </div>
 
+<div class="detail-overlay" id="quickAIModal">
+  <div class="detail-panel" id="quickAIPanel"></div>
+</div>
+
 <script>
 const CATS = {cats_json};
 const VOICE = {voice_json};
+const FUTURE = {future_json};
 const API_KEY = '{OPENROUTER_API_KEY}';
 const MODEL = '{OPENROUTER_MODEL_ID}';
 const CHANNEL = '{ch}';
@@ -361,7 +426,65 @@ function renderDashboard() {{
     html += sectionHTML('🔍', 'Needs Investigation', 'var(--muted)', CATS.investigate.slice(0, 4), 'Mixed signals — one video crushed it, another flopped. Dig into what made the winner work.');
   }}
 
-  el.innerHTML = html;
+  if (!html || html.trim().length === 0) {{
+    el.innerHTML = '<div class="empty">No categorized topics were generated yet. Re-run analytics, or use AI Story Starter / Full Content Writer above.</div>';
+  }} else {{
+    el.innerHTML = html;
+  }}
+}}
+
+function renderFutureIdeas() {{
+  const el = document.getElementById('futureIdeas');
+  if (!FUTURE || !FUTURE.length) {{
+    el.innerHTML = '';
+    return;
+  }}
+
+  const cards = FUTURE.map(s => `
+    <div class="future-card">
+      <div class="fc-top">
+        <div class="fc-topic">${{s.topic}}</div>
+        <div class="fc-score">Score ${{(s.opportunity_score || 0).toFixed(1)}}</div>
+      </div>
+      <div class="fc-meta">${{(s.category || 'education')}} · ${{(s.trend || 'steady')}} · ${{(s.avg_engagement_rate || 0).toFixed(2)}}% engagement</div>
+      <div class="fc-idea">${{(s.idea_angles && s.idea_angles[0]) || 'Create a fresh angle based on this topic\'s recent audience response.'}}</div>
+    </div>
+  `).join('');
+
+  el.innerHTML = `
+    <div class="future-wrap">
+      <h3>🚀 Recommended Future Content</h3>
+      <p class="sub" style="margin:0;color:var(--muted)">Ranked using historical topic performance + follower engagement signals.</p>
+      <div class="future-grid">${{cards}}</div>
+    </div>
+  `;
+}}
+
+function renderFutureIdeas() {{
+  const el = document.getElementById('futureIdeas');
+  if (!FUTURE || !FUTURE.length) {{
+    el.innerHTML = '';
+    return;
+  }}
+
+  const cards = FUTURE.map(s => `
+    <div class="future-card">
+      <div class="fc-top">
+        <div class="fc-topic">${{s.topic}}</div>
+        <div class="fc-score">Score ${{(s.opportunity_score || 0).toFixed(1)}}</div>
+      </div>
+      <div class="fc-meta">${{(s.category || 'education')}} · ${{(s.trend || 'steady')}} · ${{(s.avg_engagement_rate || 0).toFixed(2)}}% engagement</div>
+      <div class="fc-idea">${{(s.idea_angles && s.idea_angles[0]) || 'Create a fresh angle based on this topic\'s recent audience response.'}}</div>
+    </div>
+  `).join('');
+
+  el.innerHTML = `
+    <div class="future-wrap">
+      <h3>🚀 Recommended Future Content</h3>
+      <p class="sub" style="margin:0;color:var(--muted)">Ranked using historical topic performance + follower engagement signals.</p>
+      <div class="future-grid">${{cards}}</div>
+    </div>
+  `;
 }}
 
 function sectionHTML(icon, title, color, items, subtitle) {{
@@ -455,10 +578,20 @@ function openDetail(section, index) {{
         <div class="ab-title">Show Me the Data</div>
         <div class="ab-desc">Deep dive into the numbers</div>
       </div>
+      <div class="action-btn" onclick="showStoryStarter('${{item.topic}}')">
+        <div class="ab-icon">🧠</div>
+        <div class="ab-title">AI Story Starter</div>
+        <div class="ab-desc">Hook + narrative arc in your voice</div>
+      </div>
       <div class="action-btn" onclick="showContentStarter('${{item.topic}}')">
         <div class="ab-icon">✍️</div>
         <div class="ab-title">Help Me Write This</div>
         <div class="ab-desc">Get titles, hooks & outlines in your voice</div>
+      </div>
+      <div class="action-btn" onclick="showFullWriter('${{item.topic}}')">
+        <div class="ab-icon">📝</div>
+        <div class="ab-title">Write Full Content</div>
+        <div class="ab-desc">Generate a complete script draft</div>
       </div>
     </div>
     <div class="l3-panel" id="l3Stats"></div>
@@ -590,7 +723,98 @@ Return ONLY valid JSON.`;
   }}
 }}
 
+async function showStoryStarter(topic) {{
+  const el = document.getElementById('l3Content');
+  document.getElementById('l3Stats').classList.remove('open');
+  el.classList.add('open');
+  el.innerHTML = '<div class="cs-loading">🧠 Building story starter for ' + topic + '...</div>';
+
+  const prompt = 'You are helping ' + CHANNEL + ' craft a STORY STARTER for YouTube topic "' + topic + '".\\n\\n' +
+    'VOICE PROFILE:\\n' + JSON.stringify(VOICE, null, 2) + '\\n\\n' +
+    'Return ONLY JSON:\\n' +
+    '{{"opening_scene":"1-2 sentence cold open","story_arc":["beat1","beat2","beat3","beat4"],"audience_tension":"What pain/question keeps viewer watching","cta":"Natural call-to-action in creator\\'s voice"}}';
+
+  try {{
+    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {{
+      method: 'POST',
+      headers: {{ 'Authorization': 'Bearer ' + API_KEY, 'Content-Type': 'application/json' }},
+      body: JSON.stringify({{
+        model: MODEL,
+        messages: [{{ role: 'user', content: prompt }}],
+        temperature: 0.5,
+        max_tokens: 900
+      }})
+    }});
+    const d = await r.json();
+    let text = d.choices[0].message.content;
+    if (text.includes('```')) text = text.includes('```json') ? text.split('```json')[1].split('```')[0] : text.split('```')[1].split('```')[0];
+    const s = JSON.parse(text.trim());
+    const arc = (s.story_arc || []).map(a => '<li>' + a + '</li>').join('');
+    el.innerHTML = '<div class="content-starter">' +
+      '<h4 style="color:var(--accent);margin-bottom:16px">🧠 Story Starter: ' + topic + '</h4>' +
+      '<div class="cs-hook">' + (s.opening_scene || '') + '</div>' +
+      '<div style="margin:10px 0 6px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Story Arc</div>' +
+      '<ol class="cs-outline" style="padding-left:20px">' + arc + '</ol>' +
+      '<div style="margin-top:12px"><strong style="color:var(--bright)">Audience tension:</strong> ' + (s.audience_tension || '') + '</div>' +
+      '<div style="margin-top:8px"><strong style="color:var(--bright)">CTA:</strong> ' + (s.cta || '') + '</div>' +
+      '</div>';
+  }} catch (e) {{
+    el.innerHTML = '<div style="color:var(--red);padding:16px">Error generating story starter: ' + e.message + '</div>';
+  }}
+}}
+
+async function showFullWriter(topic) {{
+  const el = document.getElementById('l3Content');
+  document.getElementById('l3Stats').classList.remove('open');
+  el.classList.add('open');
+  el.innerHTML = '<div class="cs-loading">📝 Writing full content draft for ' + topic + '...</div>';
+
+  const prompt = 'Write a complete YouTube script draft for ' + CHANNEL + ' on topic "' + topic + '".\\n' +
+    'Use creator voice from profile:\\n' + JSON.stringify(VOICE, null, 2) + '\\n\\n' +
+    'Return ONLY JSON:\\n' +
+    '{{"title":"","script":"full script with sections","description":"youtube description","cta":"end CTA"}}';
+
+  try {{
+    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {{
+      method: 'POST',
+      headers: {{ 'Authorization': 'Bearer ' + API_KEY, 'Content-Type': 'application/json' }},
+      body: JSON.stringify({{
+        model: MODEL,
+        messages: [{{ role: 'user', content: prompt }}],
+        temperature: 0.6,
+        max_tokens: 1800
+      }})
+    }});
+    const d = await r.json();
+    let text = d.choices[0].message.content;
+    if (text.includes('```')) text = text.includes('```json') ? text.split('```json')[1].split('```')[0] : text.split('```')[1].split('```')[0];
+    const s = JSON.parse(text.trim());
+    el.innerHTML = '<div class="content-starter">' +
+      '<h4 style="color:var(--accent);margin-bottom:10px">📝 Full Content Draft: ' + topic + '</h4>' +
+      '<div style="margin-bottom:10px"><strong style="color:var(--bright)">Title:</strong> ' + (s.title || '') + '</div>' +
+      '<div style="white-space:pre-wrap;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px">' + (s.script || '') + '</div>' +
+      '<div style="margin-top:10px"><strong style="color:var(--bright)">Description:</strong> ' + (s.description || '') + '</div>' +
+      '<div style="margin-top:8px"><strong style="color:var(--bright)">CTA:</strong> ' + (s.cta || '') + '</div>' +
+      '</div>';
+  }} catch (e) {{
+    el.innerHTML = '<div style="color:var(--red);padding:16px">Error generating full content: ' + e.message + '</div>';
+  }}
+}}
+
+function quickGenerate(mode) {{
+  const panel = document.getElementById('quickAIPanel');
+  const modal = document.getElementById('quickAIModal');
+  const title = mode === 'story' ? 'AI Story Starter' : 'AI Full Content Writer';
+  const action = mode === 'story' ? 'AI Story Starter' : 'Write Full Content';
+  panel.innerHTML = '<button class="close-btn" onclick="document.getElementById(\'quickAIModal\').classList.remove(\'open\')">✕</button>' +
+    '<h2>' + title + '</h2>' +
+    '<div class="dp-reason">Open any topic card and choose <strong>' + action + '</strong> to generate output for that specific topic.</div>' +
+    '<div class="dp-reason">Tip: use the new <strong>Recommended Future Content</strong> section to pick the topic with the highest opportunity score first.</div>';
+  modal.classList.add('open');
+}}
+
 // Init
+renderFutureIdeas();
 renderDashboard();
 </script></body></html>"""
     (bp / "dashboard.html").write_text(html, encoding="utf-8")
@@ -603,9 +827,29 @@ def _build_analytics(bp, data):
     analytics = data.get("analytics_report", {})
     timeline = analytics.get("topic_timeline", {})
     performance = analytics.get("topic_performance", {})
+    content_categories = analytics.get("content_categories", {})
+    future_suggestions = analytics.get("future_content_suggestions", [])
     sources = data.get("sources", [])
     source_map = {s["source_id"]: s for s in sources}
     all_topics = set(timeline.keys()) | set(performance.keys())
+
+    # Legacy compatibility: old reports may store topic_performance as {topic: avg_views_int}
+    if performance and isinstance(next(iter(performance.values())), (int, float)):
+        channel_avg = data.get("channel_metrics", {}).get("channel_avg_views", 0)
+        if not channel_avg:
+            vv = [s.get("views", 0) for s in sources if s.get("views", 0) > 0]
+            channel_avg = int(sum(vv) / len(vv)) if vv else 1
+        topic_freq = analytics.get("topic_frequency", {})
+        normalized = {}
+        for topic, avg in performance.items():
+            avg = int(avg or 0)
+            vs = round(((avg / channel_avg) - 1) * 100, 1) if channel_avg else 0
+            normalized[topic] = {
+                "weighted_avg_views": avg,
+                "video_count": int(topic_freq.get(topic, timeline.get(topic, {}).get("count", 0)) or 0),
+                "vs_channel_avg": vs,
+            }
+        performance = normalized
 
     rows = ""
     for topic in sorted(all_topics, key=lambda t: -performance.get(t,{}).get("weighted_avg_views",0)):
@@ -640,6 +884,27 @@ def _build_analytics(bp, data):
 
         rows += f'<tr data-trend="{tr}"><td style="color:var(--bright);font-weight:500">{topic}</td><td>{count}</td><td>{avg:,}</td><td style="color:{vc};font-weight:600">{sign}{vs}%</td><td><span style="color:{tc};font-size:12px">{ti}</span></td></tr>'
 
+    category_rows = ""
+    for topic, meta in sorted(content_categories.items(), key=lambda kv: -kv[1].get("weighted_avg_views", 0))[:20]:
+        category_rows += (
+            f'<tr><td style="color:var(--bright);font-weight:500">{topic}</td>'
+            f'<td>{meta.get("category", "education")}</td>'
+            f'<td>{meta.get("video_count", 0)}</td>'
+            f'<td>{meta.get("weighted_avg_views", 0):,}</td>'
+            f'<td style="color:{"var(--green)" if meta.get("momentum_flag") == "hot" else "var(--muted)"}">{meta.get("momentum_flag", "stable")}</td></tr>'
+        )
+
+    suggestion_rows = ""
+    for s in future_suggestions[:10]:
+        suggestion_rows += (
+            f'<tr><td style="color:var(--bright);font-weight:500">{s.get("topic", "")}</td>'
+            f'<td>{s.get("category", "education")}</td>'
+            f'<td>{s.get("trend", "steady")}</td>'
+            f'<td>{s.get("avg_engagement_rate", 0):.2f}%</td>'
+            f'<td>{s.get("opportunity_score", 0):.1f}</td>'
+            f'<td style="max-width:280px">{(s.get("idea_angles") or [""])[0]}</td></tr>'
+        )
+
     html = f"""<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>{ch} Analytics · TrueInfluenceAI</title>{FONTS}
 <style>{THEME_CSS}{NAV_CSS}
@@ -664,10 +929,20 @@ tr:hover{{background:rgba(99,102,241,.03)}}
 <button class="fb" onclick="ft('steady',this)">→ Steady</button>
 </div>
 <table><thead><tr><th>Topic</th><th>Videos</th><th>Wtd Avg Views</th><th>vs Channel Avg</th><th>Trend</th></tr></thead>
-<tbody>{rows}</tbody></table></div>
+<tbody>{rows}</tbody></table>
+
+<h3 style="margin-top:28px">Topic Categories</h3>
+<p class="sub" style="margin-bottom:10px">Topics grouped by intent so strategy is easier to execute.</p>
+<table><thead><tr><th>Topic</th><th>Category</th><th>Videos</th><th>Wtd Avg Views</th><th>Momentum</th></tr></thead>
+<tbody>{category_rows or '<tr><td colspan="5" style="color:var(--muted)">No category data yet.</td></tr>'}</tbody></table>
+
+<h3 style="margin-top:28px">Future Content Suggestions</h3>
+<p class="sub" style="margin-bottom:10px">Prioritized by historical performance + follower engagement.</p>
+<table><thead><tr><th>Topic</th><th>Category</th><th>Trend</th><th>Engagement</th><th>Score</th><th>Suggested Angle</th></tr></thead>
+<tbody>{suggestion_rows or '<tr><td colspan="6" style="color:var(--muted)">No future suggestions available yet.</td></tr>'}</tbody></table>
+</div>
 <script>
-function ft(t,el){{document.querySelectorAll('.fb').forEach(b=>b.classList.remove('active'));el.classList.add('active');
-document.querySelectorAll('tbody tr').forEach(r=>{{r.style.display=t==='all'||r.dataset.trend===t?'':'none'}})}}
+function ft(t,el){{document.querySelectorAll('.fb').forEach(b=>b.classList.remove('active'));el.classList.add('active');document.querySelectorAll('tbody tr').forEach(r=>{{r.style.display=(t==='all'||r.dataset.trend===t)?'':'none';}});}}
 </script></body></html>"""
     (bp / "analytics.html").write_text(html, encoding="utf-8")
 
