@@ -140,11 +140,6 @@ def _categorize_topics_basic(data):
     timeline = analytics.get("topic_timeline", {})
     sources = data.get("sources", [])
     source_map = {s["source_id"]: s for s in sources}
-    channel_avg = data.get("channel_metrics", {}).get("channel_avg_views", 0)
-    if not channel_avg:
-        vv = [s.get("views", 0) for s in sources if s.get("views", 0) > 0]
-        channel_avg = int(sum(vv) / len(vv)) if vv else 1
-
     double_down, untapped, resurface, stop_making = [], [], [], []
 
     for topic, perf in sorted(performance.items(), key=lambda x: -x[1].get("weighted_avg_views", 0)):
@@ -885,6 +880,9 @@ def _build_analytics(bp, data):
 
         rows += f'<tr data-trend="{tr}"><td style="color:var(--bright);font-weight:500">{topic}</td><td>{count}</td><td>{avg:,}</td><td style="color:{vc};font-weight:600">{sign}{vs}%</td><td><span style="color:{tc};font-size:12px">{ti}</span></td></tr>'
 
+    if not rows:
+        rows = '<tr data-trend="steady"><td colspan="5" style="color:var(--muted)">No topic performance data available yet.</td></tr>'
+
     category_rows = ""
     for topic, meta in sorted(content_categories.items(), key=lambda kv: -kv[1].get("weighted_avg_views", 0))[:20]:
         category_rows += (
@@ -943,7 +941,7 @@ tr:hover{{background:rgba(99,102,241,.03)}}
 <tbody>{suggestion_rows or '<tr><td colspan="6" style="color:var(--muted)">No future suggestions available yet.</td></tr>'}</tbody></table>
 </div>
 <script>
-function ft(t,el){{document.querySelectorAll('.fb').forEach(b=>b.classList.remove('active'));el.classList.add('active');document.querySelectorAll('tbody tr').forEach(r=>{{r.style.display=(t==='all'||r.dataset.trend===t)?'':'none';}});}}
+function ft(t,el){{document.querySelectorAll('.fb').forEach(b=>b.classList.remove('active'));el.classList.add('active');document.querySelectorAll('#topicRows tr').forEach(r=>{{r.style.display=(t==='all'||r.dataset.trend===t)?'':'none';}});}}
 </script></body></html>"""
     (bp / "analytics.html").write_text(html, encoding="utf-8")
 
