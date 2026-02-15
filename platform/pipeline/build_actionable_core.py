@@ -7,7 +7,7 @@ Called by pages.py: from build_actionable_core import build_analytics_html
 Accepts pre-loaded data dict from _load_bundle().
 """
 
-import os, json
+import os, json, traceback
 from pathlib import Path
 from datetime import datetime
 
@@ -37,6 +37,17 @@ def _safe_get(d, *keys, default=None):
 
 
 def build_analytics_html(bp, data):
+    try:
+        return _build_analytics_html_inner(bp, data)
+    except Exception as e:
+        print(f"ERROR building analytics: {e}")
+        traceback.print_exc()
+        channel = data.get('manifest', {}).get('channel', 'Unknown')
+        return f'''<!DOCTYPE html><html><head><title>Error</title></head><body style="background:#06070b;color:#f87171;font-family:monospace;padding:40px">
+        <h1>Dashboard Build Error</h1><pre>{traceback.format_exc()}</pre>
+        <p style="color:#9ca3af">This error has been logged. The page will work once the data is fixed.</p></body></html>'''
+
+def _build_analytics_html_inner(bp, data):
     bp = Path(bp)
     insights = data.get('insights', {}) or {}
     report = data.get('analytics_report', {}) or {}
@@ -83,7 +94,8 @@ def build_analytics_html(bp, data):
     top_topics = sorted(perf_items, key=lambda x:x[1], reverse=True)[:15]
     for i,(t1,v1) in enumerate(top_topics):
         for t2,v2 in top_topics[i+1:]:
-            co = topic_pairs.get(f"{t1} + {t2}",0) or topic_pairs.get(f"{t2} + {t1}",0)
+            raw_co = topic_pairs.get(f"{t1} + {t2}", 0) or topic_pairs.get(f"{t2} + {t1}", 0)
+            co = raw_co.get('count', 0) if isinstance(raw_co, dict) else (raw_co or 0)
             if co <= 1 and v1 > channel_avg*0.8 and v2 > channel_avg*0.8:
                 untapped_combos.append({'topic_a':t1,'topic_b':t2,'views_a':int(v1),'views_b':int(v2),'co_count':co})
     untapped_combos.sort(key=lambda x:x['views_a']+x['views_b'], reverse=True)

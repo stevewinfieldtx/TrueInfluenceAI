@@ -19,6 +19,7 @@ from datetime import datetime, timedelta
 
 import numpy as np
 import requests
+import traceback
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 OPENROUTER_MODEL_ID = os.getenv("OPENROUTER_MODEL_ID", "google/gemini-2.5-flash-lite:online")
@@ -48,6 +49,24 @@ def build_insights(bundle_dir):
 
     insights = {}
 
+    try:
+        _build_all_insights(insights, sources, report, metrics, channel, channel_avg_views, channel_avg_likes, channel_avg_comments, bundle_dir)
+    except Exception as e:
+        print(f"  ERROR in insights: {e}")
+        traceback.print_exc()
+        insights['error'] = str(e)
+
+    insights['generated_at'] = datetime.utcnow().isoformat()
+    (bundle_dir / "insights.json").write_text(
+        json.dumps(insights, indent=2, ensure_ascii=False, default=str), encoding="utf-8"
+    )
+    count_r = len(insights.get('revival_candidates', []))
+    count_c = len(insights.get('topic_cannibalization', []))
+    count_p = len(insights.get('engagement_anomalies', {}).get('high_passion', []))
+    print(f"  Insights complete: {count_r} revivals, {count_c} cannibalization, {count_p} passion signals")
+
+
+def _build_all_insights(insights, sources, report, metrics, channel, channel_avg_views, channel_avg_likes, channel_avg_comments, bundle_dir):
     # ─── 1. TITLE PATTERN ANALYSIS ───────────────────────────────
     print("  [1/7] Title patterns...")
     patterns = {
@@ -119,13 +138,16 @@ def build_insights(bundle_dir):
     topic_pairs = report.get('topic_pairs', {})
 
     cannibalization = []
-    for pair_key, co_count in topic_pairs.items():
+    for pair_key, raw_co in topic_pairs.items():
+        co_count = raw_co.get('count', 0) if isinstance(raw_co, dict) else (raw_co or 0)
         parts = pair_key.split(' + ')
         if len(parts) != 2:
             continue
         t1, t2 = parts
         f1 = topic_freq.get(t1, 0)
+        f1 = f1.get('count', 0) if isinstance(f1, dict) else (f1 or 0)
         f2 = topic_freq.get(t2, 0)
+        f2 = f2.get('count', 0) if isinstance(f2, dict) else (f2 or 0)
         if f1 == 0 or f2 == 0:
             continue
         overlap_pct = round(co_count / min(f1, f2) * 100, 1)
@@ -304,13 +326,5 @@ Respond in JSON. Be specific, cite numbers, focus on NON-OBVIOUS insights:
         print(f"    AI analysis failed: {e}")
         insights['ai_deep_analysis'] = {}
 
-    # Also keep strategic_direction for backwards compat
+    # Keep strategic_direction for backwards compat
     insights['strategic_direction'] = insights.get('ai_deep_analysis', {}).get('one_big_bet', '')
-    insights['generated_at'] = datetime.utcnow().isoformat()
-
-    (bundle_dir / "insights.json").write_text(
-        json.dumps(insights, indent=2, ensure_ascii=False, default=str), encoding="utf-8"
-    )
-    print(f"  Insights complete: {len(insights.get('revival_candidates', []))} revivals, "
-          f"{len(insights.get('topic_cannibalization', []))} cannibalization pairs, "
-          f"{len(insights.get('engagement_anomalies', {}).get('high_passion', []))} passion signals")
