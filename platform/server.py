@@ -275,14 +275,14 @@ async def run_refresh_pipeline(job_id: str, channel_url: str, slug: str,
             job["progress"] = 60
             await asyncio.to_thread(build_voice_profile, bundle_dir)
 
-        # Re-run insights and analytics (always — view counts may have changed)
-        job["step"] = "Regenerating insights..."
-        job["progress"] = 70
-        await asyncio.to_thread(build_insights, bundle_dir)
-
+        # Re-run analytics THEN insights (insights reads analytics_report.json)
         job["step"] = "Updating topic analytics..."
-        job["progress"] = 80
+        job["progress"] = 70
         await asyncio.to_thread(run_analytics, bundle_dir)
+
+        job["step"] = "Regenerating insights..."
+        job["progress"] = 80
+        await asyncio.to_thread(build_insights, bundle_dir)
 
         # Re-run scripture detection if tradition is set and we have new content
         if new_count > 0:
@@ -391,18 +391,23 @@ async def run_pipeline(job_id: str, channel_url: str, slug: str,
         from pipeline.analytics import run_analytics
         from pipeline.pages import build_all_pages
 
-        # Step 1-4: Ingest
+        # Step 1-4: Ingest (0-45% — scanning, transcripts, chunking, embedding)
         job["status"] = "processing"
-        job["step"] = "Scanning channel & pulling transcripts..."
-        job["progress"] = 10
+        job["step"] = "Scanning channel videos..."
+        job["progress"] = 2
 
         bundle_dir = BUNDLE_PATH / f"{slug}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         bundle_dir.mkdir(parents=True, exist_ok=True)
 
+        def _update_progress(pct, step):
+            job["progress"] = pct
+            job["step"] = step
+
         result = await asyncio.to_thread(
-            ingest_channel, channel_url, slug, creator_name, max_videos, bundle_dir
+            ingest_channel, channel_url, slug, creator_name, max_videos, bundle_dir,
+            progress_cb=_update_progress
         )
-        job["progress"] = 40
+        job["progress"] = 48
         job["step"] = f"Ingested {result.get('video_count', 0)} videos, {result.get('chunk_count', 0)} chunks"
 
         # Step 5: Enrich
@@ -415,15 +420,15 @@ async def run_pipeline(job_id: str, channel_url: str, slug: str,
         job["progress"] = 60
         await asyncio.to_thread(build_voice_profile, bundle_dir)
 
-        # Step 7: Insights
-        job["step"] = "Generating strategic insights..."
-        job["progress"] = 70
-        await asyncio.to_thread(build_insights, bundle_dir)
-
-        # Step 8: Analytics
+        # Step 7: Analytics (MUST run before insights — insights reads analytics_report.json)
         job["step"] = "Running topic analytics..."
-        job["progress"] = 80
+        job["progress"] = 70
         await asyncio.to_thread(run_analytics, bundle_dir)
+
+        # Step 8: Insights (reads analytics_report.json for revival, cannibalization, AI deep analysis)
+        job["step"] = "Generating strategic insights..."
+        job["progress"] = 80
+        await asyncio.to_thread(build_insights, bundle_dir)
 
         # Step 8.5: Scripture detection (if religious tradition selected)
         if tradition and tradition != "none":

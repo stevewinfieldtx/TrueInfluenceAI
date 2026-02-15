@@ -170,7 +170,7 @@ async function pollStatus(jobId) {
   } catch (e) { }
 }
 function updatePipelineSteps(pct) {
-  const steps = [{key:'scan',at:10},{key:'transcripts',at:20},{key:'embed',at:35},{key:'enrich',at:50},{key:'voice',at:60},{key:'insights',at:70},{key:'analytics',at:80},{key:'pages',at:90}];
+  const steps = [{key:'scan',at:5},{key:'transcripts',at:10},{key:'embed',at:32},{key:'enrich',at:50},{key:'voice',at:60},{key:'insights',at:70},{key:'analytics',at:80},{key:'scripture',at:85},{key:'pages',at:90}];
   steps.forEach(s => {
     const el = document.querySelector(`.ps[data-step="${s.key}"]`);
     if (!el) return;

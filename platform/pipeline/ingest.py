@@ -207,7 +207,7 @@ def get_transcript(video_id):
     return get_transcript_api(video_id)
 
 
-def batch_get_transcripts(videos, max_workers=4):
+def batch_get_transcripts(videos, max_workers=4, progress_cb=None):
     """Pull transcripts for multiple videos in parallel."""
     print(f"Pulling transcripts for {len(videos)} videos...")
     transcripts = {}
@@ -228,6 +228,9 @@ def batch_get_transcripts(videos, max_workers=4):
             except Exception as e:
                 failed.append(v["video_id"])
                 print(f"   [{i+1}/{len(videos)}] Error: {v['title'][:50]} - {e}")
+            if progress_cb:
+                try: progress_cb(i + 1, len(videos))
+                except: pass
 
     print(f"   Transcripts: {len(transcripts)}/{len(videos)} ({len(failed)} failed)")
     return transcripts, failed
@@ -288,21 +291,26 @@ def embed_batch(texts, batch_id=0):
     return [item["embedding"] for item in data["data"]]
 
 
-def embed_chunks(chunks, batch_size=20):
+def embed_chunks(chunks, batch_size=20, progress_cb=None):
     """Embed all chunks in batches."""
     print(f"Embedding {len(chunks)} chunks...")
+    total_batches = (len(chunks) + batch_size - 1) // batch_size
     for i in range(0, len(chunks), batch_size):
         batch = chunks[i:i + batch_size]
         texts = [c["text"] for c in batch]
+        batch_num = i // batch_size + 1
         try:
             embeddings = embed_batch(texts, i // batch_size)
             for c, emb in zip(batch, embeddings):
                 c["embedding"] = emb
-            print(f"   Embedded batch {i // batch_size + 1}/{(len(chunks) + batch_size - 1) // batch_size}")
+            print(f"   Embedded batch {batch_num}/{total_batches}")
         except Exception as e:
-            print(f"   Batch {i // batch_size + 1} failed: {e}")
+            print(f"   Batch {batch_num} failed: {e}")
             for c in batch:
                 c["embedding"] = []
+        if progress_cb:
+            try: progress_cb(batch_num, total_batches)
+            except: pass
     return chunks
 
 
@@ -504,24 +512,32 @@ def incremental_update(channel_url, slug, creator_name, max_videos, bundle_dir):
 
 # --- Main Entry Point ---
 
-def ingest_channel(channel_url, slug, creator_name, max_videos, bundle_dir):
+def ingest_channel(channel_url, slug, creator_name, max_videos, bundle_dir, progress_cb=None):
     """
     Full ingest pipeline. Called by server.py as a background task.
     Returns dict with stats.
+    progress_cb: optional callback(pct, step_text) to update UI progress.
     """
+    def _prog(pct, step):
+        if progress_cb:
+            try: progress_cb(pct, step)
+            except: pass
+
     print(f"\n{'='*60}")
     print(f"  Ingesting: {creator_name or slug}")
     print(f"  Channel: {channel_url}")
     print(f"  Max videos: {max_videos}")
     print(f"{'='*60}")
 
-    # Step 1: List videos
+    # Step 1: List videos (5-10%)
+    _prog(5, "Scanning channel videos...")
     videos = get_channel_videos(channel_url, max_videos)
     if not videos:
         raise ValueError(f"No videos found for {channel_url}")
+    _prog(10, f"Found {len(videos)} videos. Pulling transcripts...")
 
-    # Step 2: Pull transcripts
-    transcripts, failed = batch_get_transcripts(videos)
+    # Step 2: Pull transcripts (10-30%) — the longest step
+    transcripts, failed = batch_get_transcripts(videos, progress_cb=lambda done, total: _prog(10 + int(20 * done / max(total, 1)), f"Pulling transcripts... {done}/{total}"))
     if not transcripts:
         raise ValueError(
             f"No transcripts available for {channel_url}. "
@@ -532,16 +548,19 @@ def ingest_channel(channel_url, slug, creator_name, max_videos, bundle_dir):
     # Log detected languages
     langs_found = set(t.get("lang", "unknown") for t in transcripts.values())
     print(f"Languages detected: {', '.join(langs_found)}")
+    _prog(30, f"Transcripts done ({len(transcripts)}/{len(videos)}). Chunking content...")
 
-    # Step 3: Chunk
+    # Step 3: Chunk (30-32%)
     all_chunks = []
     for vid, transcript in transcripts.items():
         chunks = chunk_transcript(transcript["segments"], vid)
         all_chunks.extend(chunks)
     print(f"Chunked: {len(all_chunks)} chunks from {len(transcripts)} videos")
+    _prog(32, f"Chunked {len(all_chunks)} content pieces. Embedding...")
 
-    # Step 4: Embed
-    all_chunks = embed_chunks(all_chunks)
+    # Step 4: Embed (32-45%)
+    all_chunks = embed_chunks(all_chunks, progress_cb=lambda done, total: _prog(32 + int(13 * done / max(total, 1)), f"Embedding content... {done}/{total} batches"))
+    _prog(45, "Saving bundle...")
 
     # Step 5: Save
     channel_name = creator_name or slug

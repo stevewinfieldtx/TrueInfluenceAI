@@ -189,34 +189,90 @@ Based ONLY on this data:
     except Exception:
         return "Strategy generation failed."
 
+def _build_topic_timeline(video_topics, bundle):
+    """Classify each topic into recent / middle / older eras.
+    Matches the local analytics.py logic that produced working data."""
+    from collections import Counter
+
+    sorted_vids = sorted(
+        bundle['sources'].keys(),
+        key=lambda vid: bundle['sources'][vid].get('published_at', '') or '',
+        reverse=True
+    )
+    vid_rank = {vid: idx for idx, vid in enumerate(sorted_vids)}
+    total_videos = len(sorted_vids)
+    third = max(total_videos // 3, 1)
+
+    topic_by_era = defaultdict(lambda: {'recent': 0, 'middle': 0, 'older': 0})
+    for vid, topics in video_topics.items():
+        rank = vid_rank.get(vid, 0)
+        era = 'recent' if rank < third else ('middle' if rank < third * 2 else 'older')
+        for t in topics:
+            t_clean = t.strip().title()
+            topic_by_era[t_clean][era] += 1
+
+    return {t: dict(eras) for t, eras in topic_by_era.items()}
+
+
+def _build_topic_pairs(video_topics):
+    """Count co-occurring topic pairs across videos.
+    Returns {"Topic A + Topic B": count} matching local format."""
+    from collections import Counter
+    pair_counter = Counter()
+    for vid, topics in video_topics.items():
+        clean = sorted(set(t.strip().title() for t in topics))
+        for i in range(len(clean)):
+            for j in range(i + 1, len(clean)):
+                pair_counter[(clean[i], clean[j])] += 1
+    return {f"{a} + {b}": c for (a, b), c in pair_counter.most_common(20)}
+
+
+def _build_topic_performance(video_topics, bundle):
+    """Simple avg views per topic — matches local format {topic: int}."""
+    import numpy as np
+    topic_views = defaultdict(list)
+    for vid, topics in video_topics.items():
+        src = bundle['sources'].get(vid, {})
+        views = src.get('views', 0)
+        for t in topics:
+            t_clean = t.strip().title()
+            topic_views[t_clean].append(views)
+    return {t: int(np.mean(v)) for t, v in topic_views.items() if v}
+
+
 def save_report(bundle, video_topics, categories, recommendations, topic_prep):
-    # Flatten stats for legacy support
+    # Build the three data structures that insights.py + build_actionable_core.py need
+    topic_timeline = _build_topic_timeline(video_topics, bundle)
+    topic_pairs = _build_topic_pairs(video_topics)
+    topic_perf = _build_topic_performance(video_topics, bundle)
+
+    # Also keep categories for any code that uses them
     flat_stats = {}
     if categories:
         for cat, items in categories.items():
             for item in items:
                 flat_stats[item['topic']] = item['avg_views']
-            
-    # Timeline data
-    timeline_data = {}
-    if topic_prep:
-        for topic, data in topic_prep.items():
-            timeline_data[topic] = {'videos': data['videos']}
+    # Merge: prefer simple avg from _build_topic_performance, fill gaps from categories
+    for t, v in flat_stats.items():
+        if t not in topic_perf:
+            topic_perf[t] = v
 
     report = {
         'channel': bundle['channel'],
         'generated': time.strftime('%Y-%m-%dT%H:%M:%S'),
         'video_topics': video_topics,
         'topic_frequency': {t: len(d['views']) for t, d in topic_prep.items()} if topic_prep else {},
-        'topic_performance': flat_stats, 
+        'topic_performance': topic_perf,
+        'topic_pairs': topic_pairs,
+        'topic_timeline': topic_timeline,
         'topic_categories': categories or {},
-        'topic_timeline': timeline_data,
         'recommendations': recommendations,
     }
 
     report_path = bundle['bundle_path'] / 'analytics_report.json'
     with open(report_path, 'w', encoding='utf-8') as f: json.dump(report, f, indent=2)
     print(f"\n📄 Report saved: {report_path}")
+    print(f"   → {len(topic_timeline)} topics in timeline, {len(topic_pairs)} pairs, {len(topic_perf)} performance entries")
 
 def run_analytics(bundle_dir):
     """
