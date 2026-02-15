@@ -12,12 +12,19 @@ import sys, os, json, random
 from pathlib import Path
 import requests
 
+# Fix Windows encoding for emoji in print statements
+if sys.stdout.encoding and sys.stdout.encoding.lower() not in ('utf-8', 'utf8'):
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
 from dotenv import load_dotenv
 load_dotenv(Path(r"C:\Users\steve\Documents\.env"))
 load_dotenv(Path(r"C:\Users\steve\Documents\TruePlatformAI\.env"))
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 ANALYSIS_MODEL = "google/gemini-2.5-flash-lite:online"
+VOICE_MODEL = "anthropic/claude-sonnet-4"  # Stronger model for voice/tone — one-time cost per creator
 BUNDLE_DIR = Path(r"C:\Users\steve\Documents\TrueInfluenceAI\bundles")
 
 
@@ -67,45 +74,78 @@ def analyze_voice(chunks, sources, channel_name):
     """Use LLM to analyze the creator's speaking style.
     Heavily weights recent content to capture current voice."""
     
-    samples = sample_content(chunks, sources, 30)
+    # Use 35 samples at 500 chars — enough for great analysis without hanging
+    samples = sample_content(chunks, sources, 35)
     sample_text = "\n\n---\n\n".join([c['text'][:500] for c in samples])
     
-    prompt = f"""You are a linguistics and communication expert. Analyze the following transcript excerpts 
-from {channel_name}'s YouTube videos and create a detailed voice/style profile.
+    prompt = f"""You are a world-class forensic linguist and ghostwriter. Your job is to dissect {channel_name}'s 
+communication DNA so precisely that content written from your analysis would be indistinguishable 
+from {channel_name}'s own words to their most dedicated fans.
 
-TRANSCRIPT SAMPLES:
+TRANSCRIPT SAMPLES (recency-weighted — more recent content sampled more heavily):
 {sample_text}
 
-Create a comprehensive voice profile covering:
+Analyze at THREE levels of depth:
 
-1. **TONE & ENERGY**: Overall vibe (motivational? casual? authoritative? warm? etc.)
-2. **VOCABULARY LEVEL**: Reading level, jargon usage, technical vs accessible
-3. **SENTENCE STRUCTURE**: Short punchy? Long flowing? Mix? Fragments?
-4. **SIGNATURE PHRASES**: Catchphrases, repeated expressions, verbal tics
-5. **SPEAKING PATTERNS**: How they open topics, transition, emphasize points
-6. **AUDIENCE RELATIONSHIP**: How they address viewers (you guys, friend, etc.)
-7. **PERSUASION STYLE**: How they convince (stories? data? authority? social proof?)
-8. **UNIQUE QUIRKS**: Anything distinctive about how they communicate
+=== LEVEL 1: MACRO VOICE (overall impression) ===
+1. **TONE & ENERGY**: Not just "motivational" — describe the specific emotional register. Are they a 
+   fired-up coach? A wise friend? A no-BS mentor? What’s the ratio of encouragement to challenge?
+2. **VOCABULARY LEVEL**: Reading level, jargon patterns, invented terms, borrowed terms from other fields
+3. **AUDIENCE RELATIONSHIP**: How do they address viewers? What power dynamic exists? Peer, mentor, 
+   guru, friend, older sibling? Do they use "you" vs "we" vs "I"?
 
-Then write a SYSTEM PROMPT (200-300 words) that would instruct an AI to respond 
-exactly like {channel_name}. The prompt should capture their authentic voice so well 
-that a fan would recognize it. Write it in second person ("You are {channel_name}...").
+=== LEVEL 2: STRUCTURAL DNA (how they build arguments) ===
+4. **OPENING PATTERNS**: How do they start a topic? Myth-bust? Personal story? Bold claim? Question? 
+   Identify their top 2-3 opening moves with specific examples from the transcripts.
+5. **ARGUMENT ARCHITECTURE**: What’s their typical flow? (e.g., Problem → Failed solutions → Their 
+   framework → Case study → Action steps). Map the actual structure they repeat.
+6. **TRANSITION PATTERNS**: Exact phrases they use to shift between sections. Not generic ones — their 
+   specific verbal bridges.
+7. **CLOSING PATTERNS**: How do they wrap up? CTA style? Final encouragement? Challenge to the viewer?
+
+=== LEVEL 3: MICRO PATTERNS (the fingerprints) ===
+8. **SIGNATURE PHRASES**: Not just catchphrases — include verbal tics, filler patterns, emphasis words 
+   they overuse ("literally", "actually", "here’s the thing"), and phrases that signal transitions.
+9. **SENTENCE RHYTHM**: Map the actual short-long-short pattern. Do they use fragments for emphasis? 
+   Do they stack rhetorical questions? Do they use lists of three?
+10. **PERSUASION FINGERPRINT**: What’s their specific evidence style? Client stories with exact numbers? 
+    Personal vulnerability? Contrarian reframes? Authority citations? Rank their persuasion tools.
+11. **UNIQUE QUIRKS**: Anything that’s distinctly THEM — humor style, metaphor preferences, topics they 
+    always circle back to, emotional beats they hit repeatedly.
+12. **WHAT THEY NEVER DO**: Equally important — what’s absent from their style? (e.g., never uses 
+    academic citations, never swears, never gets deeply personal about family, etc.)
+
+Then write TWO system prompts:
+
+a) **system_prompt** (300-400 words): A comprehensive prompt that instructs an AI to write long-form 
+   content (scripts, articles, emails) indistinguishable from {channel_name}. Include specific 
+   structural rules, phrase examples, and anti-patterns (what NOT to do).
+
+b) **system_prompt_short** (150 words): A condensed version for quick social media posts, comments, 
+   and short replies that still sound authentically like {channel_name}.
 
 Format your response as JSON:
 {{
   "tone": "...",
   "vocabulary_level": "...",
   "sentence_style": "...",
-  "signature_phrases": ["...", "..."],
+  "signature_phrases": ["...", "...", "..."],
+  "opening_patterns": "...",
+  "argument_architecture": "...",
+  "transition_phrases": ["...", "..."],
+  "closing_patterns": "...",
   "speaking_patterns": "...",
   "audience_relationship": "...",
   "persuasion_style": "...",
   "unique_quirks": "...",
-  "system_prompt": "..."
+  "what_they_never_do": "...",
+  "system_prompt": "...",
+  "system_prompt_short": "..."
 }}
 
 Return ONLY valid JSON, no markdown fences."""
 
+    print(f"   Using {VOICE_MODEL} for deep voice analysis...")
     resp = requests.post(
         'https://openrouter.ai/api/v1/chat/completions',
         headers={
@@ -113,12 +153,12 @@ Return ONLY valid JSON, no markdown fences."""
             'Content-Type': 'application/json',
         },
         json={
-            'model': ANALYSIS_MODEL,
+            'model': VOICE_MODEL,
             'messages': [{"role": "user", "content": prompt}],
-            'max_tokens': 2000,
+            'max_tokens': 4000,
             'temperature': 0.3,
         },
-        timeout=120
+        timeout=180
     )
     
     if resp.status_code != 200:
@@ -170,16 +210,24 @@ def main():
         with open(bundle_path / 'voice_profile.json', 'w') as f:
             json.dump(profile, f, indent=2)
         
-        print(f"\n✅ Voice profile saved!")
+        print(f"\n✅ Voice profile saved! (via {VOICE_MODEL})")
         print(f"\n--- PROFILE ---")
-        print(f"Tone: {profile.get('tone', 'N/A')}")
-        print(f"Vocabulary: {profile.get('vocabulary_level', 'N/A')}")
-        print(f"Sentence style: {profile.get('sentence_style', 'N/A')}")
+        print(f"Tone: {profile.get('tone', 'N/A')[:200]}")
+        print(f"Vocabulary: {profile.get('vocabulary_level', 'N/A')[:200]}")
+        print(f"Sentence style: {profile.get('sentence_style', 'N/A')[:200]}")
         phrases = profile.get('signature_phrases', [])
         if phrases:
-            print(f"Signature phrases: {', '.join(phrases[:5])}")
-        print(f"\n--- SYSTEM PROMPT ---")
+            print(f"Signature phrases: {', '.join(str(p) for p in phrases[:5])}")
+        transitions = profile.get('transition_phrases', [])
+        if transitions:
+            print(f"Transitions: {', '.join(str(t) for t in transitions[:5])}")
+        print(f"Opening patterns: {profile.get('opening_patterns', 'N/A')[:200]}")
+        print(f"Argument structure: {profile.get('argument_architecture', 'N/A')[:200]}")
+        print(f"What they NEVER do: {profile.get('what_they_never_do', 'N/A')[:200]}")
+        print(f"\n--- SYSTEM PROMPT (long-form) ---")
         print(profile.get('system_prompt', 'N/A'))
+        print(f"\n--- SYSTEM PROMPT (short) ---")
+        print(profile.get('system_prompt_short', 'N/A'))
     else:
         print("❌ Failed to build profile.")
 
