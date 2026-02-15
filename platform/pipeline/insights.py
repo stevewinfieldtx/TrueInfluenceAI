@@ -46,6 +46,9 @@ def build_insights(bundle_dir):
     channel_avg_views = metrics.get("channel_avg_views", 0)
     channel_avg_likes = metrics.get("channel_avg_likes", 0)
     channel_avg_comments = metrics.get("channel_avg_comments", 0)
+    # Fallback: compute from total if per-video avg not stored
+    if not channel_avg_comments and metrics.get('total_comments') and len(sources) > 0:
+        channel_avg_comments = metrics['total_comments'] / len(sources)
 
     insights = {}
 
@@ -103,7 +106,7 @@ def _build_all_insights(insights, sources, report, metrics, channel, channel_avg
     for s in sources:
         views = s.get('views', 0)
         likes = s.get('likes', 0)
-        comments = s.get('comment_count', 0)
+        comments = s.get('comment_count', s.get('comments', 0))
         if views < 100:
             continue
         like_rate = round(likes / views * 100, 2) if views > 0 else 0
@@ -212,7 +215,7 @@ def _build_all_insights(insights, sources, report, metrics, channel, channel_avg
         is_contrarian = any(kw in title_lower for kw in contrarian_keywords)
         entry = {
             'title': s.get('title', ''), 'views': s.get('views', 0),
-            'likes': s.get('likes', 0), 'comments': s.get('comment_count', 0),
+            'likes': s.get('likes', 0), 'comments': s.get('comment_count', s.get('comments', 0)),
             'published_at': s.get('published_at', ''),
         }
         if is_contrarian:

@@ -151,26 +151,54 @@ def _build_analytics_html_inner(bp, data):
 
     # Rising
     working_cards = ''
-    for t in rising_topics[:6]:
+    rising_actions = [
+        '✅ This topic is accelerating. Your recent videos outperform your older ones — double down before competitors catch on.',
+        '📈 Momentum is building here. Your audience is responding more each time — ride this wave with a series.',
+        '🎯 Consistent growth pattern. This isn\'t a fluke — it\'s a proven demand signal. Make this a content pillar.',
+        '🔥 Recent uploads on this topic are outperforming your channel average. Your algorithm is rewarding this.',
+        '🚀 The trajectory is clear — each video on this topic does better than the last. Go deeper, not wider.',
+        '💡 Your audience keeps coming back for this. Consider a definitive guide or series to own this space.',
+    ]
+    for i, t in enumerate(rising_topics[:6]):
         pc = 'hot' if t['vs_channel']>1.3 else ('warm' if t['vs_channel']>0.8 else 'cool')
         working_cards += _card(t['name'],'rising','▲ Rising',
             [(fmt_views(t['avg_views']),'Avg Views',''),(f"{t['vs_channel']}x",'vs Channel',pc),(f"{t['recent']}/{t['middle']}/{t['older']}",'R/M/O','')],
-            '✅ Keep making this. Audience demand is growing.','rising',t['name'],t['avg_views'])
+            rising_actions[i % len(rising_actions)],'rising',t['name'],t['avg_views'])
 
     # Revivals
     revival_cards = ''
-    for rv in revivals[:6]:
+    revival_actions = [
+        '🔄 This topic averaged {views} views and you stopped covering it. Your audience didn\'t stop caring — bring it back with a fresh angle.',
+        '💰 You left {views}-view-average content on the table. A comeback video with an updated take is nearly guaranteed to perform.',
+        '🎯 {views} avg views proves the demand existed. The question isn\'t IF this works — it\'s what\'s changed since you last covered it.',
+        '⏰ Your audience searched for this and found silence. Fill that gap before a competitor does.',
+        '🔍 This was working and you moved on. Sometimes the smartest content move is going back to what your data already proved.',
+        '💡 Dormant doesn\'t mean dead. This topic has {views} avg views baked in — a fresh take reactivates that demand instantly.',
+    ]
+    for i, rv in enumerate(revivals[:6]):
         if not isinstance(rv, dict): continue
+        views_str = fmt_views(rv.get('avg_views',0))
+        action = revival_actions[i % len(revival_actions)].replace('{views}', views_str)
         revival_cards += _card(rv.get('topic',''),'dormant',f"💤 {rv.get('trend','dormant').title()}",
             [(fmt_views(rv.get('avg_views',0)),'Avg Views',''),(f"{rv.get('vs_channel',0)}x",'vs Channel','hot')],
-            f"🔄 PROVED demand ({fmt_views(rv.get('avg_views',0))} avg) but you stopped. Bring it back.",'revival',rv.get('topic',''),rv.get('avg_views',0))
+            action,'revival',rv.get('topic',''),rv.get('avg_views',0))
 
     # Evergreen
     evergreen_cards = ''
-    for ev in evergreen_decay[:6]:
+    evergreen_actions = [
+        '📝 This got {views} views {age} but the info is aging. An updated version captures the same audience with current data.',
+        '♻️ Your {age} content still gets traffic but the facts may be stale. Refresh it and YouTube will push it again.',
+        '🎯 {views} views proves this topic has evergreen demand. A "{year} Edition" update is the lowest-risk, highest-reward move.',
+        '📈 Content this old with these numbers means search demand is real. Update the title, thumbnail, and data for a guaranteed boost.',
+        '💡 This was a hit {age}. The audience is still searching for it — give them the version with today\'s numbers.',
+        '🔄 Don\'t let your best content decay. A refresh keeps you ranking while competitors create from scratch.',
+    ]
+    yr = datetime.utcnow().year
+    for i, ev in enumerate(evergreen_decay[:6]):
+        action = evergreen_actions[i % len(evergreen_actions)].replace('{views}', fmt_views(ev['views'])).replace('{age}', ev['age_label']).replace('{year}', str(yr))
         evergreen_cards += _card(ev['title'][:60],'stale',f"📅 {ev['age_label']}",
             [(fmt_views(ev['views']),'Views',''),(ev['published_at'],'Published','')],
-            '📝 High-performing but aging. Update for a near-guaranteed win.','evergreen',ev['title'][:60],ev['views'])
+            action,'evergreen',ev['title'][:60],ev['views'])
 
     # Combos
     combo_cards = ''
@@ -188,30 +216,69 @@ def _build_analytics_html_inner(bp, data):
             [(fmt_views(cb['views_a']),esc(cb['topic_a'][:15]),''),(fmt_views(cb['views_b']),esc(cb['topic_b'][:15]),''),(str(cb['co_count']),'Times Combined','')],
             action,'combo',f"{cb['topic_a']} + {cb['topic_b']}",cb['views_a'])
 
-    # Passion
+    # Passion — filter out entries with no meaningful engagement data
     passion_cards = ''
     avg_cr = engagement.get('channel_avg_comment_rate',0) or 0
-    for hp in high_passion[:5]:
-        if not isinstance(hp, dict): continue
-        cr = hp.get('comment_rate',0); mult = round(cr/avg_cr,1) if avg_cr>0 else 0
-        passion_cards += _card(hp.get('title','')[:55],'passion',f"🔥 {mult}x comments",
-            [(fmt_views(hp.get('views',0)),'Views',''),(f"{hp.get('engagement_rate',0)}%",'Engagement',''),(f"{cr}%",'Comment Rate','')],
-            '💬 Your audience is TALKING about this. High engagement = strong demand.','passion',hp.get('title','')[:55],hp.get('views',0))
+    avg_er = engagement.get('channel_avg_like_rate',0) or 0
+    # Filter: must have either comment_rate > 0 or engagement_rate > avg
+    valid_passion = [hp for hp in high_passion if isinstance(hp, dict) and
+                     (hp.get('comment_rate', 0) > 0 or hp.get('engagement_rate', 0) > 0)]
+    passion_actions = [
+        '💬 {mult}x your normal interaction rate. This topic hit a nerve — your audience wants to discuss, debate, and share this.',
+        '🔥 When engagement spikes like this, it means you said something your audience NEEDED to hear. Follow up with a deeper dive.',
+        '🎯 {mult}x engagement isn\'t luck — it\'s demand. Your audience is telling you exactly what they want more of.',
+        '💡 High interaction = high emotional resonance. This topic makes people feel something. Explore adjacent angles.',
+        '🚀 Your audience doesn\'t just watch this — they react. That\'s the strongest signal YouTube\'s algorithm responds to.',
+    ]
+    for pi, hp in enumerate(valid_passion[:5]):
+        cr = hp.get('comment_rate',0)
+        er = hp.get('engagement_rate',0)
+        if cr > 0 and avg_cr > 0:
+            mult = round(cr/avg_cr,1)
+            badge = f"🔥 {mult}x comments"
+            stat3 = (f"{cr}%", 'Comment Rate', '')
+        else:
+            mult = round(er/avg_er,1) if avg_er > 0 else 0
+            badge = f"🔥 {er}% engaged"
+            stat3 = (f"{er}%", 'Engagement', '')
+        action = passion_actions[pi % len(passion_actions)].replace('{mult}', str(mult))
+        passion_cards += _card(hp.get('title','')[:55],'passion',badge,
+            [(fmt_views(hp.get('views',0)),'Views',''),
+             (f"{hp.get('likes',0):,}",'Likes',''),
+             stat3],
+            action,'passion',hp.get('title','')[:55],hp.get('views',0))
 
-    # Contrarian
+    # Contrarian — only show if lift is meaningful (15%+) and enough data
     contrarian_html = ''
     if contrarian and isinstance(contrarian, dict):
         c_avg = contrarian.get('avg_views_contrarian',0); n_avg = contrarian.get('avg_views_conventional',0)
-        c_lift = contrarian.get('lift_pct',0); top_c = contrarian.get('top_contrarian',[]) or []
-        items = ''.join(f'<div class="contrarian-item"><span class="ci-title">{esc(v.get("title",""))}</span><span class="ci-views">{fmt_views(v.get("views",0))}</span></div>' for v in top_c[:5] if isinstance(v,dict))
-        if c_avg or n_avg:
+        c_lift = contrarian.get('lift_pct',0); c_count = contrarian.get('contrarian_count',0)
+        top_c = contrarian.get('top_contrarian',[]) or []
+        # Only show if lift >= 15% AND at least 5 contrarian videos (statistical significance)
+        if c_lift >= 15 and c_count >= 5:
+            items = ''.join(f'<div class="contrarian-item"><span class="ci-title">{esc(v.get("title",""))}</span><span class="ci-views">{fmt_views(v.get("views",0))}</span></div>' for v in top_c[:5] if isinstance(v,dict))
+            # Build contrarian cards for rising topics — suggest contrarian angles
+            contrarian_cards = ''
+            contrarian_angles = [
+                ('Why {topic} Is a Trap', '🚫 Take your strongest topic and argue the opposite. Your audience already trusts you on this — a contrarian take will explode.'),
+                ('The Truth About {topic} Nobody Tells You', '🔍 Your audience craves insider perspective. Expose the uncomfortable reality.'),
+                ('Stop Doing {topic} Wrong', '⚠️ Position yourself as the corrector. Call out the conventional advice and offer the real answer.'),
+                ('I Was Wrong About {topic}', '💡 Vulnerability + reversal = massive engagement. Admitting mistakes builds more trust than being right.'),
+            ]
+            for i, rt in enumerate(rising_topics[:4]):
+                angle_title, angle_action = contrarian_angles[i % len(contrarian_angles)]
+                suggested_title = angle_title.replace('{topic}', rt['name'])
+                contrarian_cards += _card(suggested_title, 'passion', f'⚡ +{c_lift:.0f}% lift',
+                    [(fmt_views(rt['avg_views']), 'Base Topic Views', ''), (fmt_views(c_avg), 'Contrarian Avg', 'hot')],
+                    angle_action, 'rising', suggested_title, rt['avg_views'])
             contrarian_html = f'''<div class="section"><div class="section-icon">⚡</div><h2>Your Contrarian Edge</h2>
-            <p class="section-desc">Titles that challenge assumptions outperform conventional content.</p>
+            <p class="section-desc">When you challenge assumptions, your audience pays attention — {c_lift:.0f}% more views on average.</p>
             <div class="mega-stat-row"><div class="mega-stat"><div class="ms-val hot">{fmt_views(c_avg)}</div><div class="ms-label">Contrarian Avg</div></div>
             <div class="mega-stat"><div class="ms-val dim">{fmt_views(n_avg)}</div><div class="ms-label">Conventional Avg</div></div>
             <div class="mega-stat"><div class="ms-val green">+{c_lift:.0f}%</div><div class="ms-label">Lift</div></div></div>
-            <div class="sub-label">Top Contrarian Videos</div>{items}
-            <div class="ac-action" style="margin-top:16px">🎯 Lean into challenging conventional wisdom. Your audience rewards it.</div></div>'''
+            <div class="sub-label">Proven Contrarian Hits</div>{items}
+            {f'<div class="sub-label" style="margin-top:24px">🎯 Try These Contrarian Angles on Your Rising Topics</div><div class="card-grid">{contrarian_cards}</div>' if contrarian_cards else ''}
+            </div>'''
 
     # Title Intelligence
     title_html = ''

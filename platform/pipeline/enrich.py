@@ -163,6 +163,7 @@ def _build_channel_metrics(bundle_dir, sources, stats_map):
         "channel_q1_views": int(view_stats["q1"]),
         "channel_q3_views": int(view_stats["q3"]),
         "channel_avg_likes": int(total_likes / len(likes)) if likes else 0,
+        "channel_avg_comments": int(total_comments / len(comments)) if comments else 0,
         "channel_engagement_rate": engagement,
         "total_videos": len(sources),
         "enriched_videos": len(stats_map),
