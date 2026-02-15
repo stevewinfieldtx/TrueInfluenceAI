@@ -12,7 +12,8 @@ from pathlib import Path
 from datetime import datetime
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
-VOICE_MODEL = os.getenv("VOICE_MODEL", "anthropic/claude-sonnet-4")
+VOICE_MODEL = os.getenv("VOICE_MODEL", "anthropic/claude-sonnet-4")  # Voice ANALYSIS only
+WRITING_MODEL = os.getenv("OPENROUTER_MODEL_ID", "google/gemini-2.5-flash-lite:online")  # Content generation (cheap, high volume)
 
 
 def esc(s):
@@ -295,14 +296,15 @@ nav{{padding:14px 32px;display:flex;align-items:center;justify-content:space-bet
 </div></div>
 <div class="footer">Powered by <a href="/">TrueInfluenceAI</a> · WinTech Partners · {datetime.now().strftime('%B %Y')}</div>
 <script>
-const VOICE={voice_json};const API_KEY='{OPENROUTER_API_KEY}';const VM='{VOICE_MODEL}';const CH='{esc(channel)}';let lastContent='';
+const VOICE={voice_json};const API_KEY='{OPENROUTER_API_KEY}';const VM='{WRITING_MODEL}';const CH='{esc(channel)}';let lastContent='';
 function closeWriter(){{document.getElementById('writerOverlay').classList.remove('active')}}
 function copyContent(){{navigator.clipboard.writeText(lastContent).then(()=>{{const b=document.querySelector('.wm-btn-copy');b.textContent='✅ Copied!';setTimeout(()=>b.textContent='📋 Copy',2000)}})}}
 async function writeIt(btn){{const type=btn.dataset.type,topic=btn.dataset.topic,views=btn.dataset.views||'';btn.disabled=true;btn.textContent='⏳ Generating...';
 const o=document.getElementById('writerOverlay'),c=document.getElementById('wmContent'),t=document.getElementById('wmTitle');
 t.textContent='✍️ '+topic;c.innerHTML='<div class="wm-loading"><div class="spinner"></div><div>Writing in '+CH+'\\'s voice...</div></div>';o.classList.add('active');
 const vp=VOICE.system_prompt||VOICE.system_prompt_short||('Write in a '+(VOICE.tone||'conversational')+' style.');
-const tp={{rising:`Script outline for "${{topic}}" — rising topic at ${{views}} avg views. 3 titles, opening hook, 5-7 points, CTA.`,revival:`Comeback script for "${{topic}}" — was dormant but proved demand (${{views}} avg). 3 fresh titles, updated angle, 5-7 points.`,evergreen:`Updated version of "${{topic}}" — original got ${{views}} views but is aging. 3 updated titles, 5-7 current points.`,combo:`Mashup script combining ${{topic}}. These work separately but rarely together. 3 creative titles, 5-7 blended points.`,passion:`Follow-up to "${{topic}}" — unusually high engagement. Go deeper. 3 titles, 5-7 advanced points, community CTA.`}};
-try{{const r=await fetch('https://openrouter.ai/api/v1/chat/completions',{{method:'POST',headers:{{'Authorization':'Bearer '+API_KEY,'Content-Type':'application/json'}},body:JSON.stringify({{model:VM,messages:[{{role:'system',content:'You are a content strategist and ghostwriter. Write ALL content in this voice:\\n\\n'+vp+'\\n\\nChannel: '+CH+'\\nBe specific. Sound like this creator, not generic AI.'}},{{role:'user',content:tp[type]||'Script outline for "'+topic+'".'}}],temperature:0.6,max_tokens:2000}})}});const d=await r.json();const text=d.choices[0].message.content;lastContent=text;c.innerHTML='<div class="wm-content">'+text.replace(/\\n/g,'<br>')+'</div>'}}catch(e){{c.innerHTML='<div style="color:var(--red)">Error: '+e.message+'</div>'}}
+const yr=new Date().getFullYear();
+const tp={{rising:`Script outline for "${{topic}}" — rising topic at ${{views}} avg views. 3 titles, opening hook, 5-7 points, CTA. Current year is ${{yr}}.`,revival:`Comeback script for "${{topic}}" — was dormant but proved demand (${{views}} avg). 3 fresh titles, updated angle, 5-7 points.`,evergreen:`Updated version of "${{topic}}" — original got ${{views}} views but is aging. 3 updated titles, 5-7 current points.`,combo:`Mashup script combining ${{topic}}. These work separately but rarely together. 3 creative titles, 5-7 blended points.`,passion:`Follow-up to "${{topic}}" — unusually high engagement. Go deeper. 3 titles, 5-7 advanced points, community CTA.`}};
+try{{const r=await fetch('https://openrouter.ai/api/v1/chat/completions',{{method:'POST',headers:{{'Authorization':'Bearer '+API_KEY,'Content-Type':'application/json'}},body:JSON.stringify({{model:VM,messages:[{{role:'system',content:'You are a content strategist and ghostwriter. The current year is '+yr+'. Write ALL content in this voice:\\n\\n'+vp+'\\n\\nChannel: '+CH+'\\nBe specific. Sound like this creator, not generic AI. Always use the current year ('+yr+'), never reference past years as current.'}},{{role:'user',content:tp[type]||'Script outline for "'+topic+'".'}}],temperature:0.6,max_tokens:2000}})}});const d=await r.json();const text=d.choices[0].message.content;lastContent=text;c.innerHTML='<div class="wm-content">'+text.replace(/\\n/g,'<br>')+'</div>'}}catch(e){{c.innerHTML='<div style="color:var(--red)">Error: '+e.message+'</div>'}}
 btn.disabled=false;btn.textContent='✍️ Write It For Me'}}
 </script></body></html>'''
