@@ -279,7 +279,7 @@ nav{{padding:14px 32px;display:flex;align-items:center;justify-content:space-bet
 @media(max-width:700px){{.card-grid,.insights-grid{{grid-template-columns:1fr}}.mega-stat-row{{flex-direction:column}}.stats-bar{{gap:20px;flex-wrap:wrap}}nav{{padding:14px 16px}}}}
 </style></head><body>
 <nav><div class="logo"><span>TrueInfluence</span>AI · {esc(channel)}</div>
-<div class="links"><a href="{base}">Home</a><a href="{base}/dashboard">Dashboard</a><a href="#" class="active">Analytics</a><a href="{base}/discuss">Discuss</a></div></nav>
+<div class="links"><a href="{base}">Home</a><a href="#" class="active">Dashboard</a><a href="{base}/discuss">Discuss</a></div></nav>
 <div class="stats-bar">
 <div class="sb-item"><div class="sb-val">{total_videos}</div><div class="sb-label">Videos Analyzed</div></div>
 <div class="sb-item"><div class="sb-val">{fmt_views(total_views)}</div><div class="sb-label">Total Views</div></div>

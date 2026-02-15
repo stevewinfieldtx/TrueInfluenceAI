@@ -346,15 +346,11 @@ async def creator_dashboard(slug: str):
     return HTMLResponse(page.read_text(encoding="utf-8"))
 
 
-@app.get("/c/{slug}/analytics", response_class=HTMLResponse)
+@app.get("/c/{slug}/analytics")
 async def creator_analytics(slug: str):
-    creator = creators.get(slug)
-    if not creator:
-        raise HTTPException(404, f"Creator '{slug}' not found")
-    page = creator["path"] / "analytics.html"
-    if not page.exists():
-        raise HTTPException(404, "Analytics not built yet")
-    return HTMLResponse(page.read_text(encoding="utf-8"))
+    """Analytics merged into dashboard. Redirect for backwards compatibility."""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(f"/c/{slug}/dashboard")
 
 
 @app.get("/c/{slug}/discuss", response_class=HTMLResponse)
