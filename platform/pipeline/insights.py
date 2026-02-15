@@ -260,37 +260,25 @@ def _build_all_insights(insights, sources, report, metrics, channel, channel_avg
     # ─── 7. AI DEEP ANALYSIS ─────────────────────────────────────
     print("  [7/7] AI deep analysis...")
 
-    prompt = f"""You are a world-class content strategist analyzing a YouTube creator's channel.
-Your job is to find insights they would NEVER see on their own.
+    # Pre-build prompt data outside the f-string to avoid {{}} escaping issues
+    passion_summary = json.dumps(
+        [{'title': v['title'], 'comment_rate': str(v['comment_rate'])+'%', 'views': v['views']}
+         for v in insights['engagement_anomalies']['high_passion'][:3]],
+        indent=2
+    )
+    velocity_summary = json.dumps(insights.get('content_velocity', {}), indent=2, default=str)
+    title_summary = json.dumps(
+        {k: {'lift': v['lift_pct'], 'count': v['count'], 'avg_views': v['avg_views']}
+         for k, v in insights['title_patterns'].items()},
+        indent=2
+    )
+    revival_summary = json.dumps(insights['revival_candidates'][:5], indent=2)
+    cannibal_summary = json.dumps(insights['topic_cannibalization'][:5], indent=2)
 
-CHANNEL: {channel}
-CHANNEL AVG VIEWS: {channel_avg_views:,}
-
-=== TITLE FORMULA ANALYSIS ===
-{json.dumps({k: {'lift': v['lift_pct'], 'count': v['count'], 'avg_views': v['avg_views']} for k, v in insights['title_patterns'].items()}, indent=2)}
-
-=== CONTRARIAN vs CONVENTIONAL ===
-Contrarian titles ({insights['contrarian_content']['contrarian_count']} videos) avg {insights['contrarian_content']['avg_views_contrarian']:,} views
-Conventional titles ({insights['contrarian_content']['conventional_count']} videos) avg {insights['contrarian_content']['avg_views_conventional']:,} views
-Contrarian lift: {insights['contrarian_content']['lift_pct']}%
-
-=== ENGAGEMENT ANOMALIES ===
-Highest passion (comment rate): {json.dumps([{{'title': v['title'], 'comment_rate': str(v['comment_rate'])+'%', 'views': v['views']}} for v in insights['engagement_anomalies']['high_passion'][:3]], indent=2)}
-
-=== CONTENT VELOCITY ===
-{json.dumps(insights.get('content_velocity', {{}}), indent=2, default=str)}
-
-=== REVIVAL CANDIDATES ===
-{json.dumps(insights['revival_candidates'][:5], indent=2)}
-
-=== TOPIC CANNIBALIZATION (>60% overlap) ===
-{json.dumps(insights['topic_cannibalization'][:5], indent=2)}
-
-Respond in JSON. Be specific, cite numbers, focus on NON-OBVIOUS insights:
-{{
+    json_template = """{
   "blind_spots": ["3-4 things the creator probably doesn't realize"],
   "money_left_on_table": ["3 specific missed opportunities based on data"],
-  "title_formula_rec": {{"formula": "The title pattern they should use more", "examples": ["3 example titles using this formula"]}},
+  "title_formula_rec": {"formula": "The title pattern they should use more", "examples": ["3 example titles using this formula"]},
   "posting_rhythm_rec": "Based on velocity data, the optimal posting schedule",
   "one_big_bet": "The single biggest content bet they should make — be specific, bold, and cite the data that supports it",
   "four_followups": [
@@ -299,7 +287,36 @@ Respond in JSON. Be specific, cite numbers, focus on NON-OBVIOUS insights:
     "Follow-up action #3 — something they should STOP doing or change",
     "Follow-up action #4 — the quick win they can do THIS WEEK"
   ]
-}}"""
+}"""
+
+    prompt = f"""You are a world-class content strategist analyzing a YouTube creator's channel.
+Your job is to find insights they would NEVER see on their own.
+
+CHANNEL: {channel}
+CHANNEL AVG VIEWS: {channel_avg_views:,}
+
+=== TITLE FORMULA ANALYSIS ===
+{title_summary}
+
+=== CONTRARIAN vs CONVENTIONAL ===
+Contrarian titles ({insights['contrarian_content']['contrarian_count']} videos) avg {insights['contrarian_content']['avg_views_contrarian']:,} views
+Conventional titles ({insights['contrarian_content']['conventional_count']} videos) avg {insights['contrarian_content']['avg_views_conventional']:,} views
+Contrarian lift: {insights['contrarian_content']['lift_pct']}%
+
+=== ENGAGEMENT ANOMALIES ===
+Highest passion (comment rate): {passion_summary}
+
+=== CONTENT VELOCITY ===
+{velocity_summary}
+
+=== REVIVAL CANDIDATES ===
+{revival_summary}
+
+=== TOPIC CANNIBALIZATION (>60% overlap) ===
+{cannibal_summary}
+
+Respond in JSON. Be specific, cite numbers, focus on NON-OBVIOUS insights:
+{json_template}"""
 
     try:
         resp = requests.post(
