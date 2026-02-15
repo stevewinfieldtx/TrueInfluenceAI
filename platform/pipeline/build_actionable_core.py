@@ -64,6 +64,20 @@ def _build_analytics_html_inner(bp, data):
     engagement_rate = metrics.get('channel_engagement_rate', 0) or 0
 
     ai_deep = insights.get('ai_deep_analysis', {}) or {}
+    # If JSON parse failed, ai_deep may have 'raw' field with the text — try to extract
+    if isinstance(ai_deep, dict) and 'raw' in ai_deep and 'one_big_bet' not in ai_deep:
+        raw = ai_deep.get('raw', '')
+        try:
+            import re
+            # Try to find JSON object in raw text
+            match = re.search(r'\{[\s\S]*\}', raw)
+            if match:
+                parsed = json.loads(match.group())
+                if isinstance(parsed, dict) and 'one_big_bet' in parsed:
+                    ai_deep = parsed
+                    print("  Recovered ai_deep_analysis from raw text")
+        except:
+            pass
     contrarian = insights.get('contrarian_content', {}) or {}
     title_patterns = insights.get('title_patterns', {}) or {}
     engagement = insights.get('engagement_anomalies', {}) or {}

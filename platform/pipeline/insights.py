@@ -317,16 +317,42 @@ Respond in JSON. Be specific, cite numbers, focus on NON-OBVIOUS insights:
         )
         if resp.status_code == 200:
             text = resp.json()['choices'][0]['message']['content'].strip()
-            text = text.replace('```json', '').replace('```', '').strip()
+            # Aggressive JSON extraction — handle markdown fences, preamble, trailing text
+            # Strip markdown code fences
+            if '```' in text:
+                # Find JSON between fences
+                parts = text.split('```')
+                for part in parts:
+                    part = part.strip()
+                    if part.startswith('json'):
+                        part = part[4:].strip()
+                    if part.startswith('{'):
+                        text = part
+                        break
+            text = text.strip()
+            # If there's text before the JSON object, find the first {
+            if not text.startswith('{'):
+                brace_idx = text.find('{')
+                if brace_idx >= 0:
+                    text = text[brace_idx:]
+            # If there's text after the JSON object, find the last }
+            if text.rfind('}') > 0:
+                text = text[:text.rfind('}') + 1]
             try:
-                insights['ai_deep_analysis'] = json.loads(text)
-            except:
-                insights['ai_deep_analysis'] = {'raw': text}
-            print(f"    AI deep analysis complete")
+                parsed = json.loads(text)
+                insights['ai_deep_analysis'] = parsed
+                print(f"    AI deep analysis complete (parsed OK)")
+            except Exception as je:
+                print(f"    JSON parse failed: {je}")
+                print(f"    Raw text (first 300 chars): {text[:300]}")
+                # Try to extract fields manually with regex as last resort
+                insights['ai_deep_analysis'] = {'raw': text, '_parse_error': str(je)}
         else:
-            print(f"    API error: {resp.status_code}")
+            print(f"    API error: {resp.status_code} — {resp.text[:200]}")
     except Exception as e:
         print(f"    AI analysis failed: {e}")
+        import traceback
+        traceback.print_exc()
         insights['ai_deep_analysis'] = {}
 
     # Keep strategic_direction for backwards compat
