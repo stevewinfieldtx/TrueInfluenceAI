@@ -104,13 +104,25 @@ def build_analytics_html(bp, data):
 
     high_passion = engagement.get('high_passion',[]) or []
 
-    # ─── Big Bet ─────────────────────────────────────────────────
+    # ─── Big Bet + Four Follow-ups ──────────────────────────────────
     big_bet = ai_deep.get('one_big_bet', '') if isinstance(ai_deep, dict) else ''
+    four_followups = ai_deep.get('four_followups', []) if isinstance(ai_deep, dict) else []
     big_bet_html = ''
     if big_bet:
+        followups_html = ''
+        if four_followups and isinstance(four_followups, list):
+            followup_items = ''
+            icons = ['🎯', '🔄', '🚫', '⚡']
+            labels = ['Double Down', 'New Angle', 'Stop This', 'Quick Win']
+            for i, fu in enumerate(four_followups[:4]):
+                icon = icons[i] if i < len(icons) else '▸'
+                label = labels[i] if i < len(labels) else f'Action {i+1}'
+                followup_items += f'<div class="fu-card"><div class="fu-icon">{icon}</div><div class="fu-label">{label}</div><div class="fu-text">{esc(fu)}</div></div>'
+            followups_html = f'<div class="fu-grid">{followup_items}</div>'
         big_bet_html = f'''<div class="big-bet">
         <div class="bb-eyebrow">🏆 THE ONE BIG BET</div>
         <div class="bb-text">{esc(big_bet)}</div>
+        {followups_html}
         </div>'''
 
     # ─── Card builders ───────────────────────────────────────────
@@ -150,10 +162,19 @@ def build_analytics_html(bp, data):
 
     # Combos
     combo_cards = ''
-    for cb in untapped_combos[:6]:
+    combo_actions = [
+        '🧪 These topics crush it solo but you\'ve barely combined them. A mashup could outperform both.',
+        '🎯 Your audience loves each topic separately — give them both in one video and watch retention spike.',
+        '💡 Zero overlap so far. This is a fresh angle nobody\'s seen from you yet.',
+        '🚀 Two proven winners that haven\'t met yet. This is low-risk, high-upside content.',
+        '🎲 Rare combo = algorithmic novelty. YouTube rewards content that doesn\'t fit existing buckets.',
+        '🔥 Each topic already has demand. Combining them creates a video with two built-in audiences.',
+    ]
+    for i, cb in enumerate(untapped_combos[:6]):
+        action = combo_actions[i % len(combo_actions)]
         combo_cards += _card(f"{cb['topic_a']} + {cb['topic_b']}",'new','🆕 Untapped',
             [(fmt_views(cb['views_a']),esc(cb['topic_a'][:15]),''),(fmt_views(cb['views_b']),esc(cb['topic_b'][:15]),''),(str(cb['co_count']),'Times Combined','')],
-            '🧪 Both perform well independently but rarely combined. Test the mashup.','combo',f"{cb['topic_a']} + {cb['topic_b']}",cb['views_a'])
+            action,'combo',f"{cb['topic_a']} + {cb['topic_b']}",cb['views_a'])
 
     # Passion
     passion_cards = ''
@@ -260,6 +281,7 @@ nav{{padding:14px 32px;display:flex;align-items:center;justify-content:space-bet
 .stats-bar{{display:flex;justify-content:center;gap:40px;padding:20px 24px;background:var(--surface);border-bottom:1px solid var(--border)}}.sb-item{{text-align:center}}.sb-val{{font-family:'Fraunces',serif;font-size:22px;font-weight:900;color:var(--bright)}}.sb-label{{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;margin-top:2px}}
 .container{{max-width:1100px;margin:0 auto;padding:24px}}
 .big-bet{{background:linear-gradient(135deg,rgba(99,102,241,.08),rgba(139,92,246,.08));border:1px solid rgba(99,102,241,.3);border-radius:16px;padding:32px;margin-bottom:32px;text-align:center}}.bb-eyebrow{{font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:2px;font-weight:700;margin-bottom:12px}}.bb-text{{font-size:16px;color:var(--text);line-height:1.7;max-width:800px;margin:0 auto}}
+.fu-grid{{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:24px;text-align:left;max-width:900px;margin-left:auto;margin-right:auto}}.fu-card{{background:rgba(6,7,11,.5);border:1px solid var(--border);border-radius:10px;padding:16px}}.fu-icon{{font-size:20px;margin-bottom:6px}}.fu-label{{font-size:10px;color:var(--accent);text-transform:uppercase;letter-spacing:1.5px;font-weight:700;margin-bottom:6px}}.fu-text{{font-size:13px;color:var(--text);line-height:1.6}}@media(max-width:600px){{.fu-grid{{grid-template-columns:1fr}}}}
 .section{{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px;margin-bottom:28px}}.section-icon{{font-size:24px;margin-bottom:8px}}.section h2{{font-family:'Fraunces',serif;font-size:18px;color:var(--bright);margin-bottom:4px}}.section .section-desc{{font-size:13px;color:var(--muted);margin-bottom:20px}}
 .card-grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}}
 .action-card{{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:18px;transition:border-color .2s}}.action-card:hover{{border-color:rgba(99,102,241,.3)}}
@@ -278,7 +300,7 @@ nav{{padding:14px 32px;display:flex;align-items:center;justify-content:space-bet
 .footer{{text-align:center;padding:40px 24px;color:var(--muted);font-size:12px}}
 @media(max-width:700px){{.card-grid,.insights-grid{{grid-template-columns:1fr}}.mega-stat-row{{flex-direction:column}}.stats-bar{{gap:20px;flex-wrap:wrap}}nav{{padding:14px 16px}}}}
 </style></head><body>
-<nav><div class="logo"><span>TrueInfluence</span>AI · {esc(channel)}</div>
+<nav><div class="logo"><span>True</span>Influence<span>AI</span> · {esc(channel)}</div>
 <div class="links"><a href="{base}">Home</a><a href="#" class="active">Dashboard</a><a href="{base}/discuss">Discuss</a></div></nav>
 <div class="stats-bar">
 <div class="sb-item"><div class="sb-val">{total_videos}</div><div class="sb-label">Videos Analyzed</div></div>

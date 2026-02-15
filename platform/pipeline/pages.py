@@ -52,7 +52,7 @@ def _nav_html(channel, slug, active):
     def cls(name):
         return ' class="active"' if name == active else ''
     return f"""<nav>
-<div class="logo"><span>TrueInfluence</span>AI · {channel}</div>
+<div class="logo"><span>True</span>Influence<span>AI</span> · {channel}</div>
 <div class="links">
 <a href="{base}"{cls('home')}>Home</a>
 <a href="{base}/dashboard"{cls('dashboard')}>Dashboard</a>
@@ -127,7 +127,7 @@ def _build_index(bp, data):
 @media(max-width:700px){{.cards{{grid-template-columns:1fr}}.stats{{gap:24px}}}}
 </style></head><body>
 <div class="hero">
-<h1><span>TrueInfluence</span>AI</h1>
+<h1><span>True</span>Influence<span>AI</span></h1>
 <div class="tagline">Creator Intelligence for <strong style="color:var(--bright)">{ch}</strong></div>
 <div class="stats">
 <div class="stat"><div class="n">{tv}</div><div class="l">Videos</div></div>
