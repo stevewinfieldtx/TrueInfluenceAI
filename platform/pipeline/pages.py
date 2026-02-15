@@ -781,124 +781,16 @@ renderDashboard();
     (bp / "dashboard.html").write_text(html, encoding="utf-8")
 
 
-# ─── ANALYTICS PAGE ─────────────────────────────────────────────
+# ─── ANALYTICS PAGE (Actionable Intelligence) ──────────────────
 def _build_analytics(bp, data):
-    ch = data["manifest"].get("channel", "Unknown")
-    slug = data["slug"]
-    analytics = data.get("analytics_report", {})
-    timeline = analytics.get("topic_timeline", {})
-    performance = analytics.get("topic_performance", {})
-    content_categories = analytics.get("content_categories", {})
-    future_suggestions = analytics.get("future_content_suggestions", [])
-    sources = data.get("sources", [])
-    source_map = {s["source_id"]: s for s in sources}
-    all_topics = set(timeline.keys()) | set(performance.keys())
-
-    # Legacy compatibility: old reports may store topic_performance as {topic: avg_views_int}
-    if performance and isinstance(next(iter(performance.values())), (int, float)):
-        channel_avg = data.get("channel_metrics", {}).get("channel_avg_views", 0)
-        if not channel_avg:
-            vv = [s.get("views", 0) for s in sources if s.get("views", 0) > 0]
-            channel_avg = int(sum(vv) / len(vv)) if vv else 1
-        topic_freq = analytics.get("topic_frequency", {})
-        normalized = {}
-        for topic, avg in performance.items():
-            avg = int(avg or 0)
-            vs = round(((avg / channel_avg) - 1) * 100, 1) if channel_avg else 0
-            normalized[topic] = {
-                "weighted_avg_views": avg,
-                "video_count": int(topic_freq.get(topic, timeline.get(topic, {}).get("count", 0)) or 0),
-                "vs_channel_avg": vs,
-            }
-        performance = normalized
-
-    rows = ""
-    for topic in sorted(all_topics, key=lambda t: -performance.get(t,{}).get("weighted_avg_views",0)):
-        tl = timeline.get(topic, {})
-        perf = performance.get(topic, {})
-        count = tl.get("count", perf.get("video_count", 0))
-        avg = perf.get("weighted_avg_views", 0)
-        vs = perf.get("vs_channel_avg", 0)
-        vids = tl.get("videos", [])
-
-        if len(vids) >= 3:
-            sv = sorted(vids, key=lambda v: v.get("published", ""))
-            fh = len(sv) // 2
-            sh = len(sv) - fh
-            if sh > fh: tr, ti, tc = "rising", "↑ Rising", "var(--green)"
-            elif fh > sh: tr, ti, tc = "declining", "↓ Declining", "var(--red)"
-            else: tr, ti, tc = "steady", "→ Steady", "var(--gold)"
-        elif count == 0:
-            tr, ti, tc = "dormant", "◌ Dormant", "var(--muted)"
-        else:
-            tr, ti, tc = "steady", "→ Steady", "var(--gold)"
-
-        vc = "var(--green)" if vs > 0 else "var(--red)" if vs < 0 else "var(--muted)"
-        sign = "+" if vs > 0 else ""
-
-        rows += f'<tr data-trend="{tr}"><td style="color:var(--bright);font-weight:500">{topic}</td><td>{count}</td><td>{avg:,}</td><td style="color:{vc};font-weight:600">{sign}{vs}%</td><td><span style="color:{tc};font-size:12px">{ti}</span></td></tr>'
-
-    category_rows = ""
-    for topic, meta in sorted(content_categories.items(), key=lambda kv: -kv[1].get("weighted_avg_views", 0))[:20]:
-        category_rows += (
-            f'<tr><td style="color:var(--bright);font-weight:500">{topic}</td>'
-            f'<td>{meta.get("category", "education")}</td>'
-            f'<td>{meta.get("video_count", 0)}</td>'
-            f'<td>{meta.get("weighted_avg_views", 0):,}</td>'
-            f'<td style="color:{"var(--green)" if meta.get("momentum_flag") == "hot" else "var(--muted)"}">{meta.get("momentum_flag", "stable")}</td></tr>'
-        )
-
-    suggestion_rows = ""
-    for s in future_suggestions[:10]:
-        suggestion_rows += (
-            f'<tr><td style="color:var(--bright);font-weight:500">{s.get("topic", "")}</td>'
-            f'<td>{s.get("category", "education")}</td>'
-            f'<td>{s.get("trend", "steady")}</td>'
-            f'<td>{s.get("avg_engagement_rate", 0):.2f}%</td>'
-            f'<td>{s.get("opportunity_score", 0):.1f}</td>'
-            f'<td style="max-width:280px">{(s.get("idea_angles") or [""])[0]}</td></tr>'
-        )
-
-    html = f"""<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>{ch} Analytics · TrueInfluenceAI</title>{FONTS}
-<style>{THEME_CSS}{NAV_CSS}
-table{{width:100%;border-collapse:collapse;margin-top:16px}}
-th{{text-align:left;padding:14px 16px;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);border-bottom:2px solid var(--border);font-weight:600}}
-td{{padding:12px 16px;font-size:13px;border-bottom:1px solid rgba(26,28,42,.5)}}
-tr:hover{{background:rgba(99,102,241,.03)}}
-.fbar{{display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap}}
-.fb{{padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;font-size:12px;font-weight:500;transition:all .2s;font-family:inherit}}
-.fb:hover,.fb.active{{border-color:var(--accent);color:var(--accent-glow);background:var(--accent-soft)}}
-.note{{font-size:12px;color:var(--muted);margin-bottom:24px;padding:12px 16px;background:var(--surface);border-radius:8px;border:1px solid var(--border)}}
-</style></head><body>
-{_nav_html(ch, slug, 'analytics')}
-<div class="container">
-<h2>Content Analytics</h2>
-<p class="sub">Every topic scored and weighted — recent content counts 5x more</p>
-<div class="note">💡 Views are recency-weighted. A topic that performs well in recent videos scores higher than the same views from a year ago.</div>
-<div class="fbar">
-<button class="fb active" onclick="ft('all',this)">All ({len(all_topics)})</button>
-<button class="fb" onclick="ft('rising',this)">↑ Rising</button>
-<button class="fb" onclick="ft('declining',this)">↓ Declining</button>
-<button class="fb" onclick="ft('steady',this)">→ Steady</button>
-</div>
-<table><thead><tr><th>Topic</th><th>Videos</th><th>Wtd Avg Views</th><th>vs Channel Avg</th><th>Trend</th></tr></thead>
-<tbody>{rows}</tbody></table>
-
-<h3 style="margin-top:28px">Topic Categories</h3>
-<p class="sub" style="margin-bottom:10px">Topics grouped by intent so strategy is easier to execute.</p>
-<table><thead><tr><th>Topic</th><th>Category</th><th>Videos</th><th>Wtd Avg Views</th><th>Momentum</th></tr></thead>
-<tbody>{category_rows or '<tr><td colspan="5" style="color:var(--muted)">No category data yet.</td></tr>'}</tbody></table>
-
-<h3 style="margin-top:28px">Future Content Suggestions</h3>
-<p class="sub" style="margin-bottom:10px">Prioritized by historical performance + follower engagement.</p>
-<table><thead><tr><th>Topic</th><th>Category</th><th>Trend</th><th>Engagement</th><th>Score</th><th>Suggested Angle</th></tr></thead>
-<tbody>{suggestion_rows or '<tr><td colspan="6" style="color:var(--muted)">No future suggestions available yet.</td></tr>'}</tbody></table>
-</div>
-<script>
-function ft(t,el){{document.querySelectorAll('.fb').forEach(b=>b.classList.remove('active'));el.classList.add('active');document.querySelectorAll('tbody tr').forEach(r=>{{r.style.display=(t==='all'||r.dataset.trend===t)?'':'none';}});}}
-</script></body></html>"""
+    """Build the actionable analytics page. Every section answers: What should I do next?"""
+    try:
+        from pipeline.build_actionable_core import build_analytics_html
+    except ImportError:
+        from build_actionable_core import build_analytics_html
+    html = build_analytics_html(bp, data)
     (bp / "analytics.html").write_text(html, encoding="utf-8")
+    print(f"   [OK] analytics.html ({len(html):,} bytes)")
 
 
 # ─── DISCUSS PAGE ───────────────────────────────────────────────
