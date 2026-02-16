@@ -18,7 +18,7 @@ WRITING_MODEL = os.getenv("OPENROUTER_MODEL_ID", "google/gemini-2.5-flash-lite:o
 
 def esc(s):
     if not isinstance(s, str): s = str(s)
-    return s.replace('&','&amp;').replace('<','&lt;').replace('>','&gt;').replace('"','&quot;')
+    return s.replace('&','&amp;').replace('<','&lt;').replace('>','&gt;').replace('"','&quot;').replace("'","&#39;")
 
 def fmt_views(v):
     v = int(v or 0)
@@ -69,7 +69,6 @@ def _build_analytics_html_inner(bp, data):
         raw = ai_deep.get('raw', '')
         try:
             import re
-            # Try to find JSON object in raw text
             match = re.search(r'\{[\s\S]*\}', raw)
             if match:
                 parsed = json.loads(match.group())
@@ -81,9 +80,7 @@ def _build_analytics_html_inner(bp, data):
     contrarian = insights.get('contrarian_content', {}) or {}
     title_patterns = insights.get('title_patterns', {}) or {}
     engagement = insights.get('engagement_anomalies', {}) or {}
-    velocity = insights.get('content_velocity', {}) or {}
     revivals = insights.get('revival_candidates', []) or []
-    cannibalization = insights.get('topic_cannibalization', []) or []
     topic_timeline = report.get('topic_timeline', {}) or {}
     topic_perf = report.get('topic_performance', {}) or {}
     topic_pairs = report.get('topic_pairs', {}) or {}
@@ -133,6 +130,7 @@ def _build_analytics_html_inner(bp, data):
     # ─── Big Bet + Four Follow-ups ──────────────────────────────────
     big_bet = ai_deep.get('one_big_bet', '') if isinstance(ai_deep, dict) else ''
     four_followups = ai_deep.get('four_followups', []) if isinstance(ai_deep, dict) else []
+    big_bet_esc = esc(big_bet[:200]) if big_bet else ''
     big_bet_html = ''
     if big_bet:
         followups_html = ''
@@ -144,24 +142,29 @@ def _build_analytics_html_inner(bp, data):
                 icon = icons[i] if i < len(icons) else '▸'
                 label = labels[i] if i < len(labels) else f'Action {i+1}'
                 fu_esc = esc(fu)
+                fu_short = esc(fu[:60])
+                fu_long = esc(fu[:80])
+                bb_short = esc(big_bet[:120])
                 followup_items += f'''<div class="fu-card">
                     <div class="fu-icon">{icon}</div><div class="fu-label">{label}</div><div class="fu-text">{fu_esc}</div>
                     <div class="btn-row fu-btn-row">
-                        <button class="start-btn" onclick="startIt(this)" data-type="bigbet" data-topic="{fu_esc[:60]}" data-views="0">🚀 Get Me Started</button>
-                        <button class="write-btn-sm" onclick="writeIt(this)" data-type="bigbet" data-topic="{fu_esc[:60]}" data-views="0">✍️ Write It</button>
+                        <button class="act-btn start" onclick="startIt(this)" data-type="bigbet" data-topic="{fu_short}" data-views="0">🚀 START IT</button>
+                        <button class="act-btn write" onclick="writeIt(this)" data-type="bigbet" data-topic="{fu_short}" data-views="0">✍️ WRITE IT</button>
                     </div>
-                    <button class="explain-btn" onclick="explainMore(this)" data-topic="{fu_esc[:80]}" data-bigbet="{esc(big_bet[:120])}" data-label="{label}">🔍 Explain More</button>
+                    <button class="explain-btn" onclick="explainMore(this)" data-topic="{fu_long}" data-bigbet="{bb_short}" data-label="{label}">🔍 Explain More</button>
                 </div>'''
             followups_html = f'<div class="fu-grid">{followup_items}</div>'
-        # Big bet main also gets buttons
+        bb_topic = esc(big_bet[:60])
+        bb_long = esc(big_bet[:80])
+        bb_ref = esc(big_bet[:120])
         big_bet_html = f'''<div class="big-bet">
         <div class="bb-eyebrow">🏆 THE ONE BIG BET</div>
         <div class="bb-text">{esc(big_bet)}</div>
         <div class="btn-row bb-btn-row">
-            <button class="start-btn" onclick="startIt(this)" data-type="bigbet" data-topic="{esc(big_bet[:60])}" data-views="0">🚀 Get Me Started</button>
-            <button class="write-btn-sm" onclick="writeIt(this)" data-type="bigbet" data-topic="{esc(big_bet[:60])}" data-views="0">✍️ Write It</button>
+            <button class="act-btn start" onclick="startIt(this)" data-type="bigbet" data-topic="{bb_topic}" data-views="0">🚀 START IT</button>
+            <button class="act-btn write" onclick="writeIt(this)" data-type="bigbet" data-topic="{bb_topic}" data-views="0">✍️ WRITE IT</button>
         </div>
-        <button class="explain-btn bb-explain" onclick="explainMore(this)" data-topic="{esc(big_bet[:80])}" data-bigbet="{esc(big_bet[:120])}" data-label="The Big Bet">🔍 Explain More</button>
+        <button class="explain-btn bb-explain" onclick="explainMore(this)" data-topic="{bb_long}" data-bigbet="{bb_ref}" data-label="The Big Bet">🔍 Explain More</button>
         {followups_html}
         </div>'''
 
@@ -170,13 +173,14 @@ def _build_analytics_html_inner(bp, data):
         stat_html = ''
         for val, label, cls in stats:
             stat_html += f'<div class="ac-stat"><div class="ac-stat-val {cls}">{val}</div><div class="ac-stat-label">{label}</div></div>'
+        wt = esc(write_topic)
         return f'''<div class="action-card">
             <div class="ac-header"><span class="ac-topic">{esc(topic)}</span><span class="ac-badge {badge_cls}">{badge_text}</span></div>
             <div class="ac-stat-row">{stat_html}</div>
             <div class="ac-action">{action}</div>
             <div class="btn-row">
-                <button class="start-btn" onclick="startIt(this)" data-type="{write_type}" data-topic="{esc(write_topic)}" data-views="{write_views}">🚀 Get Me Started</button>
-                <button class="write-btn-sm" onclick="writeIt(this)" data-type="{write_type}" data-topic="{esc(write_topic)}" data-views="{write_views}">✍️ Write It For Me</button>
+                <button class="act-btn start" onclick="startIt(this)" data-type="{write_type}" data-topic="{wt}" data-views="{write_views}">🚀 START IT</button>
+                <button class="act-btn write" onclick="writeIt(this)" data-type="{write_type}" data-topic="{wt}" data-views="{write_views}">✍️ WRITE IT</button>
             </div>
         </div>'''
 
@@ -251,7 +255,6 @@ def _build_analytics_html_inner(bp, data):
     passion_cards = ''
     avg_cr = engagement.get('channel_avg_comment_rate',0) or 0
     avg_er = engagement.get('channel_avg_like_rate',0) or 0
-    # Filter: must have either comment_rate > 0 or engagement_rate > avg
     valid_passion = [hp for hp in high_passion if isinstance(hp, dict) and
                      (hp.get('comment_rate', 0) > 0 or hp.get('engagement_rate', 0) > 0)]
     passion_actions = [
@@ -285,10 +288,8 @@ def _build_analytics_html_inner(bp, data):
         c_avg = contrarian.get('avg_views_contrarian',0); n_avg = contrarian.get('avg_views_conventional',0)
         c_lift = contrarian.get('lift_pct',0); c_count = contrarian.get('contrarian_count',0)
         top_c = contrarian.get('top_contrarian',[]) or []
-        # Only show if lift >= 15% AND at least 5 contrarian videos (statistical significance)
         if c_lift >= 15 and c_count >= 5:
             items = ''.join(f'<div class="contrarian-item"><span class="ci-title">{esc(v.get("title",""))}</span><span class="ci-views">{fmt_views(v.get("views",0))}</span></div>' for v in top_c[:5] if isinstance(v,dict))
-            # Build contrarian cards for rising topics — suggest contrarian angles
             contrarian_cards = ''
             contrarian_angles = [
                 ('Why {topic} Is a Trap', '🚫 Take your strongest topic and argue the opposite. Your audience already trusts you on this — a contrarian take will explode.'),
@@ -330,42 +331,26 @@ def _build_analytics_html_inner(bp, data):
             {f'<div class="formula-box"><div class="formula-label">Winning Formula</div><div class="formula-text">{esc(formula)}</div>{ex_html}</div>' if formula else ''}
             {f'<div class="sub-label">Patterns Ranked by View Lift</div>{pat_html}' if pat_html else ''}</div>'''
 
-    # Blind spots
+    # Blind spots + Money — with START IT / WRITE IT buttons
     blind_spots = ai_deep.get('blind_spots',[]) if isinstance(ai_deep,dict) else []
     money = ai_deep.get('money_left_on_table',[]) if isinstance(ai_deep,dict) else []
     insights_cards = ''
     for bs in (blind_spots if isinstance(blind_spots,list) else []):
         bs_esc = esc(bs)
+        bs_short = esc(bs[:60])
         insights_cards += f'''<div class="insight-card blind"><div class="ic-icon">👁️</div><div class="ic-label">Blind Spot</div><div class="ic-text">{bs_esc}</div>
             <div class="btn-row ic-btn-row">
-                <button class="start-btn" onclick="startIt(this)" data-type="blindspot" data-topic="{bs_esc[:60]}" data-views="0">🚀 Get Me Started</button>
-                <button class="write-btn-sm" onclick="writeIt(this)" data-type="blindspot" data-topic="{bs_esc[:60]}" data-views="0">✍️ Write It</button>
+                <button class="act-btn start" onclick="startIt(this)" data-type="blindspot" data-topic="{bs_short}" data-views="0">🚀 START IT</button>
+                <button class="act-btn write" onclick="writeIt(this)" data-type="blindspot" data-topic="{bs_short}" data-views="0">✍️ WRITE IT</button>
             </div></div>'''
     for m in (money if isinstance(money,list) else []):
         m_esc = esc(m)
+        m_short = esc(m[:60])
         insights_cards += f'''<div class="insight-card money"><div class="ic-icon">💰</div><div class="ic-label">Money on the Table</div><div class="ic-text">{m_esc}</div>
             <div class="btn-row ic-btn-row">
-                <button class="start-btn" onclick="startIt(this)" data-type="money" data-topic="{m_esc[:60]}" data-views="0">🚀 Get Me Started</button>
-                <button class="write-btn-sm" onclick="writeIt(this)" data-type="money" data-topic="{m_esc[:60]}" data-views="0">✍️ Write It</button>
+                <button class="act-btn start" onclick="startIt(this)" data-type="money" data-topic="{m_short}" data-views="0">🚀 START IT</button>
+                <button class="act-btn write" onclick="writeIt(this)" data-type="money" data-topic="{m_short}" data-views="0">✍️ WRITE IT</button>
             </div></div>'''
-
-    # Cannibalization
-    cannibal_html = ''
-    if cannibalization and isinstance(cannibalization, list):
-        ci = ''.join(f'<div class="cannibal-item"><span class="cn-pair">{esc(cn.get("topic_a",""))} ↔ {esc(cn.get("topic_b",""))}</span><span class="cn-overlap" style="color:var(--red)">{cn.get("overlap_pct",0)}%</span><span class="cn-count">{cn.get("co_occurrences",0)}x</span></div>' for cn in cannibalization[:5] if isinstance(cn,dict))
-        if ci: cannibal_html = f'<div class="section"><div class="section-icon">⚠️</div><h2>Topic Cannibalization</h2><p class="section-desc">These topics overlap so much your audience may see them as the same thing.</p>{ci}</div>'
-
-    # Posting rhythm
-    rhythm_html = ''
-    if velocity and isinstance(velocity, dict) and velocity.get('avg_gap_days'):
-        rec = ai_deep.get('posting_rhythm_rec','') if isinstance(ai_deep,dict) else ''
-        n = velocity.get('normal_posting',{}) or {}; sl = velocity.get('slow_posting',{}) or {}
-        rhythm_html = f'''<div class="section"><div class="section-icon">⏱️</div><h2>Posting Rhythm</h2>
-        <p class="section-desc">How posting frequency affects performance.</p>
-        <div class="mega-stat-row"><div class="mega-stat"><div class="ms-val">{velocity["avg_gap_days"]}</div><div class="ms-label">Avg Days Between Posts</div></div>
-        <div class="mega-stat"><div class="ms-val">{fmt_views(n.get("avg_views",0) if isinstance(n,dict) else 0)}</div><div class="ms-label">{n.get("label","Normal") if isinstance(n,dict) else "Normal"}</div></div>
-        <div class="mega-stat"><div class="ms-val dim">{fmt_views(sl.get("avg_views",0) if isinstance(sl,dict) else 0)}</div><div class="ms-label">{sl.get("label","Slow") if isinstance(sl,dict) else "Slow"}</div></div></div>
-        {f'<div class="ac-action">{esc(rec)}</div>' if rec else ''}</div>'''
 
     # Voice JSON for Write It
     voice_json = json.dumps(voice_profile, ensure_ascii=False)
@@ -386,9 +371,10 @@ def _build_analytics_html_inner(bp, data):
         _section('🧪','Untapped Topic Combinations','Topics that perform well individually but rarely combined.',f'<div class="card-grid">{combo_cards}</div>',bool(combo_cards)),
         _section('💬','Audience Passion Signals','Videos with unusually high engagement. Your audience is telling you what they need.',f'<div class="card-grid">{passion_cards}</div>',bool(passion_cards)),
         title_html,
-        cannibal_html,
-        rhythm_html,
     ])
+
+    # ─── Build JavaScript as a separate block to avoid f-string escaping hell ───
+    js_block = _build_js_block(voice_json, OPENROUTER_API_KEY, WRITING_MODEL, esc(channel), big_bet_esc)
 
     # ─── Full page ─────────────────────────────────────────────
     return f'''<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
@@ -413,14 +399,15 @@ nav{{padding:14px 32px;display:flex;align-items:center;justify-content:space-bet
 .formula-box{{background:rgba(99,102,241,.05);border:1px solid rgba(99,102,241,.2);border-radius:12px;padding:20px;margin-bottom:20px}}.formula-label{{font-size:10px;color:var(--accent);text-transform:uppercase;letter-spacing:1px;font-weight:700;margin-bottom:6px}}.formula-text{{font-size:18px;color:var(--bright);font-weight:700;margin-bottom:12px}}.formula-example{{font-size:12px;color:var(--muted);padding:6px 0 6px 14px;border-left:2px solid rgba(99,102,241,.2);margin:4px 0;font-style:italic}}
 .pattern-row{{display:flex;align-items:center;padding:10px 14px;background:var(--surface2);border-radius:8px;margin-bottom:6px;font-size:13px}}.pr-name{{flex:1;color:var(--bright);font-weight:600}}.pr-count{{color:var(--muted);margin-right:16px;font-size:11px}}.pr-views{{color:var(--text);margin-right:16px}}.pr-lift{{font-weight:700;min-width:60px;text-align:right}}
 .insights-grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}}.insight-card{{background:var(--surface2);border-radius:12px;padding:18px;border-left:4px solid var(--accent)}}.insight-card.blind{{border-left-color:var(--gold)}}.insight-card.money{{border-left-color:var(--green)}}.ic-icon{{font-size:20px;margin-bottom:4px}}.ic-label{{font-size:10px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-bottom:6px;color:var(--accent)}}.insight-card.blind .ic-label{{color:var(--gold)}}.insight-card.money .ic-label{{color:var(--green)}}.ic-text{{font-size:13px;color:var(--text);line-height:1.6}}
-.cannibal-item{{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--surface2);border-radius:8px;margin-bottom:6px;font-size:13px}}.cn-pair{{flex:1;color:var(--bright);font-weight:600}}.cn-overlap{{font-weight:700}}.cn-count{{color:var(--muted)}}
 .sub-label{{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:16px 0 10px;font-weight:700}}
-.btn-row{{display:flex;gap:8px;margin-top:12px}}.start-btn{{flex:1;padding:10px 16px;background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.25);color:var(--green);font-size:13px;font-weight:600;border-radius:8px;cursor:pointer;transition:all .2s;font-family:inherit}}.start-btn:hover{{background:rgba(52,211,153,.2);border-color:var(--green)}}.start-btn:disabled{{opacity:.5;cursor:wait}}
-.write-btn-sm{{flex:0 0 auto;padding:10px 16px;background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);color:var(--accent-glow);font-size:12px;font-weight:600;border-radius:8px;cursor:pointer;transition:all .2s;font-family:inherit}}.write-btn-sm:hover{{background:var(--accent);color:#fff;border-color:var(--accent)}}.write-btn-sm:disabled{{opacity:.5;cursor:wait}}
+.btn-row{{display:flex;gap:8px;margin-top:12px}}
+.act-btn{{flex:1;padding:10px 16px;font-size:13px;font-weight:600;border-radius:8px;cursor:pointer;transition:all .2s;font-family:inherit;text-transform:uppercase;letter-spacing:.5px}}
+.act-btn.start{{background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.25);color:var(--green)}}.act-btn.start:hover{{background:rgba(52,211,153,.2);border-color:var(--green)}}
+.act-btn.write{{background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);color:var(--accent-glow)}}.act-btn.write:hover{{background:var(--accent);color:#fff;border-color:var(--accent)}}
+.act-btn:disabled{{opacity:.5;cursor:wait}}
 .explain-btn{{display:block;width:100%;margin-top:8px;padding:8px 14px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.2);color:var(--gold);font-size:11px;font-weight:600;border-radius:8px;cursor:pointer;transition:all .2s;font-family:inherit}}.explain-btn:hover{{background:rgba(251,191,36,.15);border-color:var(--gold)}}.explain-btn:disabled{{opacity:.5;cursor:wait}}
 .bb-btn-row{{justify-content:center;max-width:500px;margin:16px auto 0}}.bb-explain{{max-width:300px;margin:10px auto 0}}
 .fu-btn-row{{margin-top:10px}}.ic-btn-row{{margin-top:10px}}
-.write-btn{{display:block;width:100%;margin-top:12px;padding:10px 16px;background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);color:var(--accent-glow);font-size:13px;font-weight:600;border-radius:8px;cursor:pointer;transition:all .2s;font-family:inherit}}.write-btn:hover{{background:var(--accent);color:#fff;border-color:var(--accent)}}.write-btn:disabled{{opacity:.5;cursor:wait}}
 .writer-overlay{{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;backdrop-filter:blur(4px)}}.writer-overlay.active{{display:flex;align-items:center;justify-content:center}}.writer-modal{{background:var(--surface);border:1px solid var(--border);border-radius:16px;width:90%;max-width:800px;max-height:85vh;display:flex;flex-direction:column}}.wm-header{{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}}.wm-header h3{{flex:1;font-size:16px;color:var(--bright)}}.wm-close{{background:none;border:none;color:var(--muted);font-size:24px;cursor:pointer}}.wm-close:hover{{color:var(--bright)}}.wm-body{{flex:1;overflow-y:auto;padding:24px}}.wm-content{{font-size:14px;color:var(--text);line-height:1.8;white-space:pre-wrap}}.wm-loading{{text-align:center;padding:60px 24px;color:var(--muted)}}.wm-loading .spinner{{display:inline-block;width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin-bottom:16px}}@keyframes spin{{to{{transform:rotate(360deg)}}}}.wm-actions{{padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:10px}}.wm-actions button{{padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;font-family:inherit}}.wm-btn-copy{{background:var(--accent);color:#fff}}.wm-btn-close{{background:var(--surface2);color:var(--muted);border:1px solid var(--border)}}
 .footer{{text-align:center;padding:40px 24px;color:var(--muted);font-size:12px}}
 @media(max-width:700px){{.card-grid,.insights-grid{{grid-template-columns:1fr}}.mega-stat-row{{flex-direction:column}}.stats-bar{{gap:20px;flex-wrap:wrap}}nav{{padding:14px 16px}}}}
@@ -442,29 +429,112 @@ nav{{padding:14px 32px;display:flex;align-items:center;justify-content:space-bet
 <div class="wm-actions"><button class="wm-btn-copy" onclick="copyContent()">📋 Copy</button><button class="wm-btn-close" onclick="closeWriter()">Close</button></div>
 </div></div>
 <div class="footer">Powered by <a href="/">TrueInfluenceAI</a> · WinTech Partners · {datetime.now().strftime('%B %Y')}</div>
-<script>
-const VOICE={voice_json};const API_KEY='{OPENROUTER_API_KEY}';const VM='{WRITING_MODEL}';const CH='{esc(channel)}';let lastContent='';const BIGBET='{esc(big_bet[:200]) if big_bet else ""}';
-function closeWriter(){{document.getElementById('writerOverlay').classList.remove('active')}}
-function copyContent(){{navigator.clipboard.writeText(lastContent).then(()=>{{const b=document.querySelector('.wm-btn-copy');b.textContent='✅ Copied!';setTimeout(()=>b.textContent='📋 Copy',2000)}})}}
-async function writeIt(btn){{const type=btn.dataset.type,topic=btn.dataset.topic,views=btn.dataset.views||'';btn.disabled=true;btn.textContent='⏳ Generating...';
-const o=document.getElementById('writerOverlay'),c=document.getElementById('wmContent'),t=document.getElementById('wmTitle');
-t.textContent='✍️ '+topic;c.innerHTML='<div class="wm-loading"><div class="spinner"></div><div>Writing in '+CH+'\\'s voice...</div></div>';o.classList.add('active');
-const vp=VOICE.system_prompt||VOICE.system_prompt_short||('Write in a '+(VOICE.tone||'conversational')+' style.');
-const yr=new Date().getFullYear();
-const tp={{rising:`Script outline for "${{topic}}" — rising topic at ${{views}} avg views. 3 titles, opening hook, 5-7 points, CTA. Current year is ${{yr}}.`,revival:`Comeback script for "${{topic}}" — was dormant but proved demand (${{views}} avg). 3 fresh titles, updated angle, 5-7 points.`,evergreen:`Updated version of "${{topic}}" — original got ${{views}} views but is aging. 3 updated titles, 5-7 current points.`,combo:`Mashup script combining ${{topic}}. These work separately but rarely together. 3 creative titles, 5-7 blended points.`,passion:`Follow-up to "${{topic}}" — unusually high engagement. Go deeper. 3 titles, 5-7 advanced points, community CTA.`,bigbet:`Full script for this strategic action: "${{topic}}". Write a complete script with 3 titles, hook, 5-7 detailed points, and CTA. This is part of the big bet strategy.`,blindspot:`Script addressing this blind spot: "${{topic}}". Write a complete script with 3 titles, hook, 5-7 points that tackle this gap, and CTA.`,money:`Script capturing this opportunity: "${{topic}}". Write a complete script with 3 titles, hook, 5-7 points, and CTA focused on monetizing this gap.`}};
-try{{const r=await fetch('https://openrouter.ai/api/v1/chat/completions',{{method:'POST',headers:{{'Authorization':'Bearer '+API_KEY,'Content-Type':'application/json'}},body:JSON.stringify({{model:VM,messages:[{{role:'system',content:'You are a content strategist and ghostwriter. The current year is '+yr+'. Write ALL content in this voice:\\n\\n'+vp+'\\n\\nChannel: '+CH+'\\nBe specific. Sound like this creator, not generic AI. Always use the current year ('+yr+'), never reference past years as current.'}},{{role:'user',content:tp[type]||'Script outline for "'+topic+'".'}}],temperature:0.6,max_tokens:2000}})}});const d=await r.json();const text=d.choices[0].message.content;lastContent=text;c.innerHTML='<div class="wm-content">'+text.replace(/\\n/g,'<br>')+'</div>'}}catch(e){{c.innerHTML='<div style="color:var(--red)">Error: '+e.message+'</div>'}}
-btn.disabled=false;btn.textContent='✍️ Write It For Me'}}
-async function startIt(btn){{const type=btn.dataset.type,topic=btn.dataset.topic,views=btn.dataset.views||'';btn.disabled=true;btn.textContent='⏳ Thinking...';
-const o=document.getElementById('writerOverlay'),c=document.getElementById('wmContent'),t=document.getElementById('wmTitle');
-t.textContent='🚀 Getting You Started: '+topic;c.innerHTML='<div class="wm-loading"><div class="spinner"></div><div>Building your starting framework...</div></div>';o.classList.add('active');
-const yr=new Date().getFullYear();
-const sp={{rising:`For the rising topic "${{topic}}" (${{views}} avg views), give me a STARTING FRAMEWORK only. Include: 1) A suggested angle/thesis in 1-2 sentences 2) 3 possible titles 3) 5-7 bullet points the creator should cover with a brief explanation of WHY each point matters 4) Suggested hook (first 15 seconds). Do NOT write the full script — just enough to get them started. They\'ll do the actual writing.`,revival:`For the revival topic "${{topic}}" (${{views}} avg views — dormant), give me a STARTING FRAMEWORK: 1) What\'s changed since they last covered it 2) Fresh angle in 1-2 sentences 3) 3 updated titles 4) 5-7 bullet points with brief explanations of why each matters 5) Hook idea. Do NOT write the full script.`,evergreen:`For updating "${{topic}}" (${{views}} views, aging content), give me a STARTING FRAMEWORK: 1) What likely needs updating 2) 3 refreshed titles 3) 5-7 bullet points covering what to add/change with explanations 4) New hook angle. Do NOT write the full script.`,combo:`For combining ${{topic}}, give me a STARTING FRAMEWORK: 1) The thesis that ties both together 2) 3 mashup titles 3) 5-7 blended bullet points with explanations of how to weave both topics 4) Hook idea. Do NOT write the full script.`,passion:`For the high-engagement topic "${{topic}}", give me a STARTING FRAMEWORK for a deeper follow-up: 1) Why this resonated (in 1-2 sentences) 2) 3 follow-up titles 3) 5-7 deeper bullet points with explanations 4) Community engagement CTA idea. Do NOT write the full script.`,bigbet:`For this strategic action: "${{topic}}" (part of the big bet strategy), give me a STARTING FRAMEWORK: 1) The core thesis in 1-2 sentences 2) 3 title options 3) 5-7 bullet points with brief explanations of why each matters and what to cover 4) Suggested hook. Do NOT write the full script.`,blindspot:`For this blind spot: "${{topic}}", give me a STARTING FRAMEWORK to address it: 1) Why this matters (1-2 sentences) 2) 3 video title ideas that tackle it 3) 5-7 content bullet points with explanations 4) Opening hook idea. Do NOT write the full script.`,money:`For this missed opportunity: "${{topic}}", give me a STARTING FRAMEWORK: 1) The opportunity in 1-2 sentences 2) 3 title ideas to capture it 3) 5-7 bullet points with explanations of what to cover 4) Hook idea. Do NOT write the full script.`}};
-try{{const r=await fetch('https://openrouter.ai/api/v1/chat/completions',{{method:'POST',headers:{{'Authorization':'Bearer '+API_KEY,'Content-Type':'application/json'}},body:JSON.stringify({{model:VM,messages:[{{role:'system',content:'You are a content strategist. The current year is '+yr+'. Give a concise STARTING FRAMEWORK — bullet points with brief explanations, suggested titles, and a hook. Do NOT write the full script. The creator will do the actual writing. Channel: '+CH}},{{role:'user',content:sp[type]||'Starting framework for "'+topic+'".'}}],temperature:0.5,max_tokens:1500}})}});const d=await r.json();const text=d.choices[0].message.content;lastContent=text;c.innerHTML='<div class="wm-content">'+text.replace(/\n/g,'<br>')+'</div>'}}catch(e){{c.innerHTML='<div style="color:var(--red)">Error: '+e.message+'</div>'}}
-btn.disabled=false;btn.textContent='🚀 Get Me Started'}}
-async function explainMore(btn){{const topic=btn.dataset.topic,bigbet=btn.dataset.bigbet||BIGBET,label=btn.dataset.label||'';btn.disabled=true;btn.textContent='⏳ Analyzing...';
-const o=document.getElementById('writerOverlay'),c=document.getElementById('wmContent'),t=document.getElementById('wmTitle');
-t.textContent='🔍 Deep Dive: '+label;c.innerHTML='<div class="wm-loading"><div class="spinner"></div><div>Building deep explanation...</div></div>';o.classList.add('active');
-const yr=new Date().getFullYear();
-try{{const r=await fetch('https://openrouter.ai/api/v1/chat/completions',{{method:'POST',headers:{{'Authorization':'Bearer '+API_KEY,'Content-Type':'application/json'}},body:JSON.stringify({{model:VM,messages:[{{role:'system',content:'You are a senior content strategist explaining your reasoning in depth. Be thorough, cite specific data patterns, explain the WHY behind each recommendation. Channel: '+CH+'. Year: '+yr}},{{role:'user',content:'Give me a DEEP EXPLANATION of this strategic recommendation:\n\nThe Big Bet: "'+bigbet+'"\n\nSpecific action: "'+topic+'" ('+label+')\n\nExplain:\n1) The data pattern that led to this recommendation\n2) Why this specific approach vs alternatives\n3) What success looks like if they execute it\n4) The risk of NOT doing it\n5) How this connects to their overall channel strategy\n6) Timeline — when should they expect to see results\n\nBe specific, cite the channel data, and explain the strategic logic step by step.'}}],temperature:0.4,max_tokens:2000}})}});const d=await r.json();const text=d.choices[0].message.content;lastContent=text;c.innerHTML='<div class="wm-content">'+text.replace(/\n/g,'<br>')+'</div>'}}catch(e){{c.innerHTML='<div style="color:var(--red)">Error: '+e.message+'</div>'}}
-btn.disabled=false;btn.textContent='🔍 Explain More'}}
-</script></body></html>'''
+{js_block}
+</body></html>'''
+
+
+def _build_js_block(voice_json, api_key, writing_model, channel, big_bet_esc):
+    """Build JS as a plain string — NO f-string escaping issues."""
+    return '''<script>
+const VOICE=''' + voice_json + ''';
+const API_KEY="''' + api_key + '''";
+const VM="''' + writing_model + '''";
+const CH="''' + channel + '''";
+const BIGBET="''' + big_bet_esc + '''";
+let lastContent="";
+
+function closeWriter(){document.getElementById("writerOverlay").classList.remove("active")}
+function copyContent(){navigator.clipboard.writeText(lastContent).then(function(){var b=document.querySelector(".wm-btn-copy");b.textContent="✅ Copied!";setTimeout(function(){b.textContent="📋 Copy"},2000)})}
+
+function _openModal(title,loadingMsg){
+  var o=document.getElementById("writerOverlay"),c=document.getElementById("wmContent"),t=document.getElementById("wmTitle");
+  t.textContent=title;
+  c.innerHTML='<div class="wm-loading"><div class="spinner"></div><div>'+loadingMsg+'</div></div>';
+  o.classList.add("active");
+  return {o:o,c:c,t:t};
+}
+
+async function _callLLM(sysPr,userPr){
+  var r=await fetch("https://openrouter.ai/api/v1/chat/completions",{
+    method:"POST",headers:{"Authorization":"Bearer "+API_KEY,"Content-Type":"application/json"},
+    body:JSON.stringify({model:VM,messages:[{role:"system",content:sysPr},{role:"user",content:userPr}],temperature:0.5,max_tokens:2000})
+  });
+  var d=await r.json();
+  return d.choices[0].message.content;
+}
+
+var writePrompts={
+  rising:'Script outline for "TOPIC" — rising topic at VIEWS avg views. 3 titles, opening hook, 5-7 points, CTA.',
+  revival:'Comeback script for "TOPIC" — was dormant but proved demand (VIEWS avg). 3 fresh titles, updated angle, 5-7 points.',
+  evergreen:'Updated version of "TOPIC" — original got VIEWS views but is aging. 3 updated titles, 5-7 current points.',
+  combo:'Mashup script combining TOPIC. These work separately but rarely together. 3 creative titles, 5-7 blended points.',
+  passion:'Follow-up to "TOPIC" — unusually high engagement. Go deeper. 3 titles, 5-7 advanced points, community CTA.',
+  bigbet:'Full script for this strategic action: "TOPIC". Complete script with 3 titles, hook, 5-7 detailed points, and CTA.',
+  blindspot:'Script addressing this blind spot: "TOPIC". 3 titles, hook, 5-7 points that tackle this gap, and CTA.',
+  money:'Script capturing this opportunity: "TOPIC". 3 titles, hook, 5-7 points, and CTA focused on this gap.'
+};
+
+var startPrompts={
+  rising:'For the rising topic "TOPIC" (VIEWS avg views), give a STARTING FRAMEWORK only: 1) Suggested angle in 1-2 sentences 2) 3 possible titles 3) 5-7 bullet points with brief explanation of WHY each matters 4) Suggested hook. Do NOT write the full script.',
+  revival:'For the revival topic "TOPIC" (VIEWS avg views, dormant), STARTING FRAMEWORK: 1) What changed since they last covered it 2) Fresh angle in 1-2 sentences 3) 3 updated titles 4) 5-7 bullet points with explanations 5) Hook idea. Do NOT write the full script.',
+  evergreen:'For updating "TOPIC" (VIEWS views, aging), STARTING FRAMEWORK: 1) What needs updating 2) 3 refreshed titles 3) 5-7 bullet points with explanations 4) New hook. Do NOT write the full script.',
+  combo:'For combining TOPIC, STARTING FRAMEWORK: 1) Thesis tying both together 2) 3 mashup titles 3) 5-7 blended bullet points with explanations 4) Hook. Do NOT write full script.',
+  passion:'For high-engagement topic "TOPIC", STARTING FRAMEWORK for deeper follow-up: 1) Why this resonated 2) 3 follow-up titles 3) 5-7 deeper bullet points with explanations 4) CTA idea. Do NOT write full script.',
+  bigbet:'For this strategic action: "TOPIC", STARTING FRAMEWORK: 1) Core thesis in 1-2 sentences 2) 3 title options 3) 5-7 bullet points with explanations of why each matters 4) Suggested hook. Do NOT write full script.',
+  blindspot:'For this blind spot: "TOPIC", STARTING FRAMEWORK: 1) Why this matters 2) 3 video title ideas 3) 5-7 content bullet points with explanations 4) Hook idea. Do NOT write full script.',
+  money:'For this missed opportunity: "TOPIC", STARTING FRAMEWORK: 1) The opportunity in 1-2 sentences 2) 3 title ideas 3) 5-7 bullet points with explanations 4) Hook idea. Do NOT write full script.'
+};
+
+async function writeIt(btn){
+  var type=btn.dataset.type,topic=btn.dataset.topic,views=btn.dataset.views||"";
+  btn.disabled=true;btn.textContent="⏳ WRITING...";
+  var m=_openModal("✍️ "+topic,"Writing in "+CH+"'s voice...");
+  var vp=VOICE.system_prompt||VOICE.system_prompt_short||("Write in a "+(VOICE.tone||"conversational")+" style.");
+  var yr=new Date().getFullYear();
+  var tpl=writePrompts[type]||('Script outline for "TOPIC".');
+  var prompt=tpl.replace(/TOPIC/g,topic).replace(/VIEWS/g,views);
+  try{
+    var text=await _callLLM(
+      "You are a content strategist and ghostwriter. Year: "+yr+". Write in this voice:\\n\\n"+vp+"\\n\\nChannel: "+CH+"\\nBe specific. Sound like this creator.",
+      prompt
+    );
+    lastContent=text;
+    m.c.innerHTML='<div class="wm-content">'+text.replace(/\\n/g,"<br>")+'</div>';
+  }catch(e){m.c.innerHTML='<div style="color:#f87171">Error: '+e.message+'</div>'}
+  btn.disabled=false;btn.textContent="✍️ WRITE IT";
+}
+
+async function startIt(btn){
+  var type=btn.dataset.type,topic=btn.dataset.topic,views=btn.dataset.views||"";
+  btn.disabled=true;btn.textContent="⏳ THINKING...";
+  var m=_openModal("🚀 Getting You Started: "+topic,"Building your starting framework...");
+  var yr=new Date().getFullYear();
+  var tpl=startPrompts[type]||('Starting framework for "TOPIC".');
+  var prompt=tpl.replace(/TOPIC/g,topic).replace(/VIEWS/g,views);
+  try{
+    var text=await _callLLM(
+      "You are a content strategist. Year: "+yr+". Give a concise STARTING FRAMEWORK — bullet points with brief explanations, titles, and a hook. Do NOT write the full script. Channel: "+CH,
+      prompt
+    );
+    lastContent=text;
+    m.c.innerHTML='<div class="wm-content">'+text.replace(/\\n/g,"<br>")+'</div>';
+  }catch(e){m.c.innerHTML='<div style="color:#f87171">Error: '+e.message+'</div>'}
+  btn.disabled=false;btn.textContent="🚀 START IT";
+}
+
+async function explainMore(btn){
+  var topic=btn.dataset.topic,bigbet=btn.dataset.bigbet||BIGBET,label=btn.dataset.label||"";
+  btn.disabled=true;btn.textContent="⏳ ANALYZING...";
+  var m=_openModal("🔍 Deep Dive: "+label,"Building deep explanation...");
+  var yr=new Date().getFullYear();
+  try{
+    var text=await _callLLM(
+      "You are a senior content strategist explaining reasoning in depth. Be thorough, cite data patterns, explain WHY. Channel: "+CH+". Year: "+yr,
+      "DEEP EXPLANATION of this strategic recommendation:\\n\\nThe Big Bet: \\""+bigbet+"\\"\\n\\nSpecific action: \\""+topic+"\\" ("+label+")\\n\\nExplain:\\n1) Data pattern behind this recommendation\\n2) Why this approach vs alternatives\\n3) What success looks like\\n4) Risk of NOT doing it\\n5) How it connects to overall channel strategy\\n6) Timeline for results\\n\\nBe specific and explain the strategic logic step by step."
+    );
+    lastContent=text;
+    m.c.innerHTML='<div class="wm-content">'+text.replace(/\\n/g,"<br>")+'</div>';
+  }catch(e){m.c.innerHTML='<div style="color:#f87171">Error: '+e.message+'</div>'}
+  btn.disabled=false;btn.textContent="🔍 Explain More";
+}
+</script>'''
