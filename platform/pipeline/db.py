@@ -62,13 +62,12 @@ def init_db():
         raw_cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
         raw_conn.commit()
         raw_cur.close()
+        print("   [DB] pgvector extension ready")
     finally:
         raw_conn.close()
 
-    # Step 2: Now register_vector will work
+    # Step 2: Create tables (MUST commit before ivfflat attempt)
     with db_cursor() as cur:
-
-        # Creators
         cur.execute("""
             CREATE TABLE IF NOT EXISTS creators (
                 slug            TEXT PRIMARY KEY,
@@ -83,7 +82,6 @@ def init_db():
             );
         """)
 
-        # Sources (one row per video per creator)
         cur.execute("""
             CREATE TABLE IF NOT EXISTS sources (
                 id              SERIAL PRIMARY KEY,
@@ -102,8 +100,6 @@ def init_db():
         """)
         cur.execute("CREATE INDEX IF NOT EXISTS idx_sources_slug ON sources(slug);")
 
-        # Chunks with vector embeddings
-        # Using 4096 dimensions (matches qwen/qwen3-embedding-8b via OpenRouter)
         cur.execute("""
             CREATE TABLE IF NOT EXISTS chunks (
                 id              SERIAL PRIMARY KEY,
@@ -119,18 +115,20 @@ def init_db():
             );
         """)
         cur.execute("CREATE INDEX IF NOT EXISTS idx_chunks_slug ON chunks(slug);")
+    print("   [DB] Tables created")
 
-        # pgvector index for fast cosine similarity search
-        # ivfflat is good up to ~1M vectors; switch to hnsw if you outgrow it
-        try:
+    # Step 3: ivfflat index in SEPARATE transaction
+    # If this fails (empty table), the tables above are already safely committed
+    try:
+        with db_cursor() as cur:
             cur.execute("""
                 CREATE INDEX IF NOT EXISTS idx_chunks_embedding
                 ON chunks USING ivfflat (embedding vector_cosine_ops)
                 WITH (lists = 100);
             """)
-        except Exception:
-            # ivfflat needs enough rows to build; skip on empty table, will auto-work later
-            pass
+        print("   [DB] ivfflat index ready")
+    except Exception as e:
+        print(f"   [DB] ivfflat index skipped (will auto-create when data exists): {e}")
 
     print("   [DB] Schema initialized")
 
