@@ -374,7 +374,7 @@ def _build_analytics_html_inner(bp, data):
     ])
 
     # ─── Build JavaScript as a separate block to avoid f-string escaping hell ───
-    js_block = _build_js_block(voice_json, OPENROUTER_API_KEY, WRITING_MODEL, esc(channel), big_bet_esc)
+    js_block = _build_js_block(slug, esc(channel), big_bet_esc)
 
     # ─── Full page ─────────────────────────────────────────────
     return f'''<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
@@ -433,108 +433,71 @@ nav{{padding:14px 32px;display:flex;align-items:center;justify-content:space-bet
 </body></html>'''
 
 
-def _build_js_block(voice_json, api_key, writing_model, channel, big_bet_esc):
-    """Build JS as a plain string — NO f-string escaping issues."""
-    return '''<script>
-const VOICE=''' + voice_json + ''';
-const API_KEY="''' + api_key + '''";
-const VM="''' + writing_model + '''";
-const CH="''' + channel + '''";
-const BIGBET="''' + big_bet_esc + '''";
+def _build_js_block(slug, channel, big_bet_esc):
+    """Build JS that calls /api/write/{slug} server-side.
+    ZERO API keys in the browser. All LLM calls happen on the server."""
+    tpl = '<script>
+const SLUG="__SLUG__";
+const CH="__CH__";
+const BIGBET="__BIGBET__";
 let lastContent="";
 
 function closeWriter(){document.getElementById("writerOverlay").classList.remove("active")}
-function copyContent(){navigator.clipboard.writeText(lastContent).then(function(){var b=document.querySelector(".wm-btn-copy");b.textContent="✅ Copied!";setTimeout(function(){b.textContent="📋 Copy"},2000)})}
+function copyContent(){navigator.clipboard.writeText(lastContent).then(function(){var b=document.querySelector(".wm-btn-copy");b.textContent="\\u2705 Copied!";setTimeout(function(){b.textContent="\\ud83d\\udccb Copy"},2000)})}
 
 function _openModal(title,loadingMsg){
   var o=document.getElementById("writerOverlay"),c=document.getElementById("wmContent"),t=document.getElementById("wmTitle");
   t.textContent=title;
-  c.innerHTML='<div class="wm-loading"><div class="spinner"></div><div>'+loadingMsg+'</div></div>';
+  c.innerHTML=\'<div class="wm-loading"><div class="spinner"></div><div>\'+loadingMsg+\'</div></div>\';
   o.classList.add("active");
   return {o:o,c:c,t:t};
 }
 
-async function _callLLM(sysPr,userPr){
-  var r=await fetch("https://openrouter.ai/api/v1/chat/completions",{
-    method:"POST",headers:{"Authorization":"Bearer "+API_KEY,"Content-Type":"application/json"},
-    body:JSON.stringify({model:VM,messages:[{role:"system",content:sysPr},{role:"user",content:userPr}],temperature:0.5,max_tokens:2000})
+async function _callServer(payload){
+  var r=await fetch("/api/write/"+SLUG,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify(payload)
   });
   var d=await r.json();
-  return d.choices[0].message.content;
+  if(d.error) throw new Error(d.error);
+  return d.content||"No content generated.";
 }
-
-var writePrompts={
-  rising:'Script outline for "TOPIC" — rising topic at VIEWS avg views. 3 titles, opening hook, 5-7 points, CTA.',
-  revival:'Comeback script for "TOPIC" — was dormant but proved demand (VIEWS avg). 3 fresh titles, updated angle, 5-7 points.',
-  evergreen:'Updated version of "TOPIC" — original got VIEWS views but is aging. 3 updated titles, 5-7 current points.',
-  combo:'Mashup script combining TOPIC. These work separately but rarely together. 3 creative titles, 5-7 blended points.',
-  passion:'Follow-up to "TOPIC" — unusually high engagement. Go deeper. 3 titles, 5-7 advanced points, community CTA.',
-  bigbet:'Full script for this strategic action: "TOPIC". Complete script with 3 titles, hook, 5-7 detailed points, and CTA.',
-  blindspot:'Script addressing this blind spot: "TOPIC". 3 titles, hook, 5-7 points that tackle this gap, and CTA.',
-  money:'Script capturing this opportunity: "TOPIC". 3 titles, hook, 5-7 points, and CTA focused on this gap.'
-};
-
-var startPrompts={
-  rising:'For the rising topic "TOPIC" (VIEWS avg views), give a STARTING FRAMEWORK only: 1) Suggested angle in 1-2 sentences 2) 3 possible titles 3) 5-7 bullet points with brief explanation of WHY each matters 4) Suggested hook. Do NOT write the full script.',
-  revival:'For the revival topic "TOPIC" (VIEWS avg views, dormant), STARTING FRAMEWORK: 1) What changed since they last covered it 2) Fresh angle in 1-2 sentences 3) 3 updated titles 4) 5-7 bullet points with explanations 5) Hook idea. Do NOT write the full script.',
-  evergreen:'For updating "TOPIC" (VIEWS views, aging), STARTING FRAMEWORK: 1) What needs updating 2) 3 refreshed titles 3) 5-7 bullet points with explanations 4) New hook. Do NOT write the full script.',
-  combo:'For combining TOPIC, STARTING FRAMEWORK: 1) Thesis tying both together 2) 3 mashup titles 3) 5-7 blended bullet points with explanations 4) Hook. Do NOT write full script.',
-  passion:'For high-engagement topic "TOPIC", STARTING FRAMEWORK for deeper follow-up: 1) Why this resonated 2) 3 follow-up titles 3) 5-7 deeper bullet points with explanations 4) CTA idea. Do NOT write full script.',
-  bigbet:'For this strategic action: "TOPIC", STARTING FRAMEWORK: 1) Core thesis in 1-2 sentences 2) 3 title options 3) 5-7 bullet points with explanations of why each matters 4) Suggested hook. Do NOT write full script.',
-  blindspot:'For this blind spot: "TOPIC", STARTING FRAMEWORK: 1) Why this matters 2) 3 video title ideas 3) 5-7 content bullet points with explanations 4) Hook idea. Do NOT write full script.',
-  money:'For this missed opportunity: "TOPIC", STARTING FRAMEWORK: 1) The opportunity in 1-2 sentences 2) 3 title ideas 3) 5-7 bullet points with explanations 4) Hook idea. Do NOT write full script.'
-};
 
 async function writeIt(btn){
   var type=btn.dataset.type,topic=btn.dataset.topic,views=btn.dataset.views||"";
-  btn.disabled=true;btn.textContent="⏳ WRITING...";
-  var m=_openModal("✍️ "+topic,"Writing in "+CH+"'s voice...");
-  var vp=VOICE.system_prompt||VOICE.system_prompt_short||("Write in a "+(VOICE.tone||"conversational")+" style.");
-  var yr=new Date().getFullYear();
-  var tpl=writePrompts[type]||('Script outline for "TOPIC".');
-  var prompt=tpl.replace(/TOPIC/g,topic).replace(/VIEWS/g,views);
+  btn.disabled=true;btn.textContent="\\u23f3 WRITING...";
+  var m=_openModal("\\u270d\\ufe0f "+topic,"Writing in "+CH+"\'s voice...");
   try{
-    var text=await _callLLM(
-      "You are a content strategist and ghostwriter. Year: "+yr+". Write in this voice:\\n\\n"+vp+"\\n\\nChannel: "+CH+"\\nBe specific. Sound like this creator.",
-      prompt
-    );
+    var text=await _callServer({topic:topic,type:"write",card_type:type,views:views});
     lastContent=text;
-    m.c.innerHTML='<div class="wm-content">'+text.replace(/\\n/g,"<br>")+'</div>';
-  }catch(e){m.c.innerHTML='<div style="color:#f87171">Error: '+e.message+'</div>'}
-  btn.disabled=false;btn.textContent="✍️ WRITE IT";
+    m.c.innerHTML=\'<div class="wm-content">\'+text.replace(/\\n/g,"<br>")+\'</div>\';
+  }catch(e){m.c.innerHTML=\'<div style="color:#f87171">Error: \'+e.message+\'</div>\'}
+  btn.disabled=false;btn.textContent="\\u270d\\ufe0f WRITE IT";
 }
 
 async function startIt(btn){
   var type=btn.dataset.type,topic=btn.dataset.topic,views=btn.dataset.views||"";
-  btn.disabled=true;btn.textContent="⏳ THINKING...";
-  var m=_openModal("🚀 Getting You Started: "+topic,"Building your starting framework...");
-  var yr=new Date().getFullYear();
-  var tpl=startPrompts[type]||('Starting framework for "TOPIC".');
-  var prompt=tpl.replace(/TOPIC/g,topic).replace(/VIEWS/g,views);
+  btn.disabled=true;btn.textContent="\\u23f3 THINKING...";
+  var m=_openModal("\\ud83d\\ude80 Getting You Started: "+topic,"Building your starting framework...");
   try{
-    var text=await _callLLM(
-      "You are a content strategist. Year: "+yr+". Give a concise STARTING FRAMEWORK — bullet points with brief explanations, titles, and a hook. Do NOT write the full script. Channel: "+CH,
-      prompt
-    );
+    var text=await _callServer({topic:topic,type:"start",card_type:type,views:views});
     lastContent=text;
-    m.c.innerHTML='<div class="wm-content">'+text.replace(/\\n/g,"<br>")+'</div>';
-  }catch(e){m.c.innerHTML='<div style="color:#f87171">Error: '+e.message+'</div>'}
-  btn.disabled=false;btn.textContent="🚀 START IT";
+    m.c.innerHTML=\'<div class="wm-content">\'+text.replace(/\\n/g,"<br>")+\'</div>\';
+  }catch(e){m.c.innerHTML=\'<div style="color:#f87171">Error: \'+e.message+\'</div>\'}
+  btn.disabled=false;btn.textContent="\\ud83d\\ude80 START IT";
 }
 
 async function explainMore(btn){
   var topic=btn.dataset.topic,bigbet=btn.dataset.bigbet||BIGBET,label=btn.dataset.label||"";
-  btn.disabled=true;btn.textContent="⏳ ANALYZING...";
-  var m=_openModal("🔍 Deep Dive: "+label,"Building deep explanation...");
-  var yr=new Date().getFullYear();
+  btn.disabled=true;btn.textContent="\\u23f3 ANALYZING...";
+  var m=_openModal("\\ud83d\\udd0d Deep Dive: "+label,"Building deep explanation...");
   try{
-    var text=await _callLLM(
-      "You are a senior content strategist explaining reasoning in depth. Be thorough, cite data patterns, explain WHY. Channel: "+CH+". Year: "+yr,
-      "DEEP EXPLANATION of this strategic recommendation:\\n\\nThe Big Bet: \\""+bigbet+"\\"\\n\\nSpecific action: \\""+topic+"\\" ("+label+")\\n\\nExplain:\\n1) Data pattern behind this recommendation\\n2) Why this approach vs alternatives\\n3) What success looks like\\n4) Risk of NOT doing it\\n5) How it connects to overall channel strategy\\n6) Timeline for results\\n\\nBe specific and explain the strategic logic step by step."
-    );
+    var text=await _callServer({topic:topic,type:"explain",big_bet:bigbet,label:label});
     lastContent=text;
-    m.c.innerHTML='<div class="wm-content">'+text.replace(/\\n/g,"<br>")+'</div>';
-  }catch(e){m.c.innerHTML='<div style="color:#f87171">Error: '+e.message+'</div>'}
-  btn.disabled=false;btn.textContent="🔍 Explain More";
+    m.c.innerHTML=\'<div class="wm-content">\'+text.replace(/\\n/g,"<br>")+\'</div>\';
+  }catch(e){m.c.innerHTML=\'<div style="color:#f87171">Error: \'+e.message+\'</div>\'}
+  btn.disabled=false;btn.textContent="\\ud83d\\udd0d Explain More";
 }
-</script>'''
+</script>'
+    return tpl.replace("__SLUG__", slug).replace("__CH__", channel).replace("__BIGBET__", big_bet_esc)

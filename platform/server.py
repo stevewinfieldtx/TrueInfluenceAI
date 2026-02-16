@@ -286,7 +286,8 @@ async def run_refresh_pipeline(job_id: str, channel_url: str, slug: str,
 
         # Re-run scripture detection if tradition is set and we have new content
         if new_count > 0:
-            tradition = manifest.get("tradition", "")
+            _manifest = json.loads((bundle_dir / "manifest.json").read_text(encoding="utf-8")) if (bundle_dir / "manifest.json").exists() else {}
+            tradition = _manifest.get("tradition", "")
             if tradition and tradition != "none":
                 try:
                     from pipeline.scripture import process_bundle_scriptures
@@ -305,6 +306,13 @@ async def run_refresh_pipeline(job_id: str, channel_url: str, slug: str,
         manifest = json.loads((bundle_dir / "manifest.json").read_text(encoding="utf-8"))
         creators[slug]["total_videos"] = manifest.get("total_videos", 0)
         creators[slug]["created"] = manifest.get("created_at", "")
+
+        # Sync to database
+        try:
+            from pipeline.db import sync_bundle_to_db
+            await asyncio.to_thread(sync_bundle_to_db, slug, bundle_dir)
+        except Exception as e:
+            print(f"DB sync error on refresh (non-fatal): {e}")
 
         job["status"] = "complete"
         job["progress"] = 100
@@ -362,6 +370,65 @@ async def creator_discuss(slug: str):
     if not page.exists():
         raise HTTPException(404, "Discussion page not built yet")
     return HTMLResponse(page.read_text(encoding="utf-8"))
+
+
+# ---------------------------------------------------------------------------
+# API: Chat — server-side RAG (no API keys in browser)
+# ---------------------------------------------------------------------------
+@app.post("/api/chat/{slug}")
+async def api_chat(slug: str, request: Request):
+    creator = creators.get(slug)
+    if not creator:
+        raise HTTPException(404, f"Creator '{slug}' not found")
+    body = await request.json()
+    question = body.get("question", "").strip()
+    if not question:
+        raise HTTPException(400, "question is required")
+    from pipeline.chat_api import handle_chat
+    result = await asyncio.to_thread(handle_chat, slug, question, creator["path"])
+    return JSONResponse(result)
+
+
+# ---------------------------------------------------------------------------
+# API: Write — server-side content generation (no API keys in browser)
+# ---------------------------------------------------------------------------
+@app.post("/api/write/{slug}")
+async def api_write(slug: str, request: Request):
+    creator = creators.get(slug)
+    if not creator:
+        raise HTTPException(404, f"Creator '{slug}' not found")
+    body = await request.json()
+    topic = body.get("topic", "").strip()
+    write_type = body.get("type", "start")  # start | write | explain
+    extra_context = body.get("context", "")
+    card_type = body.get("card_type", "")
+    views = body.get("views", "")
+    big_bet = body.get("big_bet", "")
+    label = body.get("label", "")
+    if not topic:
+        raise HTTPException(400, "topic is required")
+    from pipeline.chat_api import handle_write
+    result = await asyncio.to_thread(
+        handle_write, slug, topic, write_type, creator["path"],
+        extra_context, card_type, views, big_bet, label
+    )
+    return JSONResponse(result)
+
+
+# ---------------------------------------------------------------------------
+# API: Force sync a creator's bundle to database
+# ---------------------------------------------------------------------------
+@app.post("/api/sync/{slug}")
+async def sync_to_db(slug: str):
+    creator = creators.get(slug)
+    if not creator:
+        raise HTTPException(404, f"Creator '{slug}' not found")
+    try:
+        from pipeline.db import sync_from_bundle
+        await asyncio.to_thread(sync_from_bundle, slug, creator["path"])
+        return JSONResponse({"status": "synced", "slug": slug})
+    except Exception as e:
+        raise HTTPException(500, f"Sync failed: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -456,7 +523,7 @@ async def run_pipeline(job_id: str, channel_url: str, slug: str,
                 manifest["tradition"] = tradition
             manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
-        # Register creator
+        # Register creator (in-memory)
         creators[slug] = {
             "path": bundle_dir,
             "name": creator_name or slug,
@@ -464,6 +531,15 @@ async def run_pipeline(job_id: str, channel_url: str, slug: str,
             "created": datetime.utcnow().isoformat(),
             "total_videos": result.get("video_count", 0),
         }
+
+        # Sync bundle data to PostgreSQL (chunks, sources, voice profile)
+        job["step"] = "Syncing to database..."
+        job["progress"] = 95
+        try:
+            from pipeline.db import sync_bundle_to_db
+            await asyncio.to_thread(sync_bundle_to_db, slug, bundle_dir)
+        except Exception as e:
+            print(f"DB sync error (non-fatal): {e}")
 
         job["status"] = "complete"
         job["progress"] = 100
@@ -485,6 +561,31 @@ async def run_pipeline(job_id: str, channel_url: str, slug: str,
 @app.on_event("startup")
 async def startup():
     load_creator_registry()
+
+    # Initialize database (PostgreSQL + pgvector)
+    db_ok = False
+    try:
+        from pipeline.db import init_db, get_creator, sync_bundle_to_db
+        init_db()
+        db_ok = True
+        print(f"   Database: connected (pgvector enabled)")
+    except Exception as e:
+        print(f"   Database: NOT available ({e}) — chat/write will use JSON fallback")
+
+    # Auto-migrate existing bundles to DB on first deploy
+    if db_ok and creators:
+        migrated = 0
+        for slug, info in creators.items():
+            try:
+                existing = get_creator(slug)
+                if not existing:
+                    sync_bundle_to_db(slug, info["path"])
+                    migrated += 1
+            except Exception as e:
+                print(f"   Migration skip {slug}: {e}")
+        if migrated:
+            print(f"   Migrated {migrated} creator(s) to database")
+
     print(f"TrueInfluenceAI Platform")
     print(f"   Creators loaded: {len(creators)}")
     print(f"   Bundle path: {BUNDLE_PATH}")

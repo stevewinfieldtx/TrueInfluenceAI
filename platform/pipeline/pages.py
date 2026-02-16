@@ -10,9 +10,7 @@ import os, json
 from pathlib import Path
 from datetime import datetime
 
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
-OPENROUTER_MODEL_ID = os.getenv("OPENROUTER_MODEL_ID", "google/gemini-2.5-flash-lite:online")
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "qwen/qwen3-embedding-8b")
+# API keys removed — all LLM/embedding calls now server-side via chat_api.py
 
 # ─── Shared Styles ──────────────────────────────────────────────
 FONTS = '<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Fraunces:opsz,wght@9..144,400;9..144,700;9..144,900&display=swap" rel="stylesheet">'
@@ -161,17 +159,14 @@ def _build_dashboard(bp, data):
     print(f"   [OK] dashboard.html ({len(html):,} bytes)")
 
 
-# ─── DISCUSS PAGE ───────────────────────────────────────────────
+# ─── DISCUSS PAGE (lightweight — calls server API) ──────────────
 def _build_discuss(bp, data):
+    """Build a lightweight discuss page. ~5KB instead of 18MB.
+    All RAG + LLM calls happen server-side via /api/chat/{slug}.
+    ZERO API keys exposed to the browser."""
     ch = data["manifest"].get("channel", "Unknown")
     slug = data["slug"]
-    voice = data.get("voice_profile", {})
-    chunks = data.get("chunks", [])
-    sources = data.get("sources", [])
-
-    src_map = json.dumps({s["source_id"]: {"title": s.get("title", ""), "url": s.get("url", "")} for s in sources})
-    chunks_js = json.dumps([{"id": c["chunk_id"], "vid": c["video_id"], "text": c["text"], "ts": c.get("timestamp", 0), "emb": c.get("embedding", [])} for c in chunks])
-    voice_js = json.dumps(voice)
+    ch_escaped = ch.replace("'", "\\'")
     base = f"/c/{slug}"
 
     html = f"""<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
@@ -204,111 +199,45 @@ body{{display:flex;flex-direction:column;height:100vh}}
 <p>AI trained on their content, speaking in their voice</p>
 </div>
 <div class="starters">
-<span class="st" onclick="askQ('What topics does {ch} focus on most?')">Top topics</span>
-<span class="st" onclick="askQ('What advice does {ch} give to beginners?')">Beginner advice</span>
-<span class="st" onclick="askQ('How has {ch}\\'s content evolved recently?')">Content evolution</span>
-<span class="st" onclick="askQ('What makes {ch}\\'s perspective unique?')">Unique perspective</span>
+<span class="st" onclick="askQ('What topics does {ch_escaped} focus on most?')">Top topics</span>
+<span class="st" onclick="askQ('What advice does {ch_escaped} give to beginners?')">Beginner advice</span>
+<span class="st" onclick="askQ('How has {ch_escaped}\\'s content evolved recently?')">Content evolution</span>
+<span class="st" onclick="askQ('What makes {ch_escaped}\\'s perspective unique?')">Unique perspective</span>
 </div>
 <div class="msgs" id="msgs"></div>
 <div class="ibar"><input id="qi" placeholder="Ask about {ch}'s content..." onkeydown="if(event.key==='Enter')askQ()"><button onclick="askQ()">Ask</button></div>
 </div>
-
 <script>
-const CHUNKS={chunks_js};
-const SOURCES={src_map};
-const VOICE={voice_js};
-const API_KEY='{OPENROUTER_API_KEY}';
-const MODEL='{OPENROUTER_MODEL_ID}';
-
-function dot(a,b){{let s=0;for(let i=0;i<a.length;i++)s+=a[i]*b[i];return s}}
-function mag(a){{return Math.sqrt(a.reduce((s,v)=>s+v*v,0))}}
-function cosine(a,b){{if(!a.length||!b.length)return 0;return dot(a,b)/(mag(a)*mag(b))}}
-
-async function getEmbedding(text){{
-  const r=await fetch('https://openrouter.ai/api/v1/embeddings',{{
-    method:'POST',headers:{{'Authorization':'Bearer '+API_KEY,'Content-Type':'application/json'}},
-    body:JSON.stringify({{model:'{EMBEDDING_MODEL}',input:[text]}})
-  }});
-  const d=await r.json();return d.data[0].embedding;
-}}
-
-function searchChunks(qEmb,k=5){{
-  const scored=CHUNKS.map(c=>{{
-    const sim=cosine(qEmb,c.emb);
-    return{{...c,score:sim}};
-  }});
-  scored.sort((a,b)=>b.score-a.score);
-  return scored.slice(0,k);
-}}
-
+const SLUG='{slug}';
 async function askQ(q){{
-  const input=document.getElementById('qi');
+  var input=document.getElementById('qi');
   if(!q)q=input.value.trim();
   if(!q)return;
   input.value='';
-
-  const md=document.getElementById('msgs');
-  md.innerHTML+=`<div class="msg user">${{q}}</div>`;
-  md.innerHTML+=`<div class="msg ai" id="thinking">Thinking...</div>`;
+  var md=document.getElementById('msgs');
+  md.innerHTML+='<div class="msg user">'+q.replace(/</g,'&lt;')+'</div>';
+  md.innerHTML+='<div class="msg ai" id="thinking">Thinking...</div>';
   md.scrollTop=md.scrollHeight;
-
   try{{
-    const qEmb=await getEmbedding(q);
-    const hits=searchChunks(qEmb,5);
-    const context=hits.map(h=>`[Source: ${{SOURCES[h.vid]?.title||h.vid}}]\\n${{h.text}}`).join('\\n---\\n');
-
-    const sysPrompt=`You ARE ${{'{ch}'}}. You are speaking directly to a viewer as yourself.
-
-YOUR VOICE:
-${{JSON.stringify(VOICE)}}
-
-RULES:
-- Speak as ${{'{ch}'}} in first person. Use "I", "my experience", etc.
-- Draw from ALL your knowledge as one unified expertise.
-- NEVER cite sources inline. No "[Source: ...]" or bracketed references. Just speak naturally.
-- Do NOT mention video titles in your response. The UI adds relevant links below.
-- Be direct, practical, and conversational.
-- Use your signature phrases naturally when they fit.
-- Keep responses focused and actionable. No fluff.
-- Do NOT end with video recommendations.
-- Do NOT use bullet points or numbered lists. Talk naturally in paragraphs.`;
-
-    const relevantVids = [];
-    const seenVids = new Set();
-    hits.forEach(h => {{
-      if (!seenVids.has(h.vid)) {{
-        seenVids.add(h.vid);
-        const s = SOURCES[h.vid];
-        if (s) relevantVids.push(s);
-      }}
+    var r=await fetch('/api/chat/'+SLUG,{{
+      method:'POST',
+      headers:{{'Content-Type':'application/json'}},
+      body:JSON.stringify({{question:q}})
     }});
-
-    const r=await fetch('https://openrouter.ai/api/v1/chat/completions',{{
-      method:'POST',headers:{{'Authorization':'Bearer '+API_KEY,'Content-Type':'application/json'}},
-      body:JSON.stringify({{model:MODEL,messages:[
-        {{role:'system',content:sysPrompt}},
-        {{role:'user',content:`Here is your knowledge to draw from (do NOT cite these individually — synthesize into one natural response):\\n\\n${{context}}\\n\\nViewer question: ${{q}}`}}
-      ],temperature:0.5,max_tokens:1200}})
-    }});
-    const d=await r.json();
-    let answer=d.choices[0].message.content;
-
-    let refs = '';
-    if (relevantVids.length > 0) {{
-      refs = '<div class="refs">📺 Related videos: ';
-      relevantVids.slice(0, 3).forEach(v => {{
-        refs += `<a href="${{v.url}}" target="_blank">${{v.title}}</a> · `;
-      }});
-      refs += '</div>';
+    var d=await r.json();
+    var answer=d.answer||'Sorry, no response.';
+    var refs='';
+    if(d.sources&&d.sources.length>0){{
+      refs='<div class="refs">📺 Related: ';
+      d.sources.forEach(function(s){{refs+='<a href="'+s.url+'" target="_blank">'+s.title+'</a> · ';}});
+      refs+='</div>';
     }}
-
-    answer = answer.replace(/You might want to check out.*$/s, '').replace(/Check out these videos.*$/s, '').trim();
-    document.getElementById('thinking').outerHTML=`<div class="msg ai">${{answer.replace(/\\n/g,'<br>')}}${{refs}}</div>`;
+    document.getElementById('thinking').outerHTML='<div class="msg ai">'+answer.replace(/\n/g,'<br>')+refs+'</div>';
   }}catch(e){{
-    document.getElementById('thinking').outerHTML=`<div class="msg ai" style="color:var(--red)">Error: ${{e.message}}</div>`;
+    document.getElementById('thinking').outerHTML='<div class="msg ai" style="color:var(--red)">Error: '+e.message+'</div>';
   }}
   md.scrollTop=md.scrollHeight;
 }}
 </script></body></html>"""
     (bp / "discuss.html").write_text(html, encoding="utf-8")
-    print(f"   [OK] discuss.html")
+    print(f"   [OK] discuss.html (~{len(html)//1024}KB — server-side RAG)")
