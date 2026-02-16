@@ -65,7 +65,26 @@ def _llm_call(messages: list, model: str = None, temperature: float = 0.5,
     return resp.json()["choices"][0]["message"]["content"]
 
 
-# ─── Chat (RAG Q&A) ─────────────────────────────────────────────
+def _clean_answer(text: str) -> str:
+    """Strip inline citations, source references, and trailing recommendations.
+    Safety net — even if the LLM ignores prompt instructions, we clean the output."""
+    # [Source: anything] or [source: anything]
+    text = re.sub(r'\[Source:[^\]]*\]', '', text, flags=re.IGNORECASE)
+    # [website.com] or [anything.com/org/net/io/etc]
+    text = re.sub(r'\[[a-zA-Z0-9.-]+\.(com|org|net|io|co|ai|gov|edu|info|vn|uk)[^\]]*\]', '', text, flags=re.IGNORECASE)
+    # (Source: anything) variant
+    text = re.sub(r'\(Source:[^)]*\)', '', text, flags=re.IGNORECASE)
+    # Bare domain mentions mid-sentence: "according to vnexpress.net" etc.
+    text = re.sub(r'\b(?:according to|per|via|from|see|on|at)\s+[a-zA-Z0-9.-]+\.(com|org|net|io|vn|co)\b', '', text, flags=re.IGNORECASE)
+    # Trailing video recommendations
+    text = re.sub(r'(?:You might want to |Check out |Watch my |See my |I covered this in ).*$', '', text, flags=re.DOTALL)
+    # Clean up double spaces and dangling whitespace
+    text = re.sub(r'  +', ' ', text)
+    text = re.sub(r' +([.,!?])', r'\1', text)
+    return text.strip()
+
+
+# ─── Voice loading ───────────────────────────────────────────────
 
 def _load_voice_from_bundle(bundle_path):
     """Load voice profile + channel name from bundle JSON files (fallback when DB is empty)."""
@@ -101,19 +120,19 @@ def _get_creator_voice(slug, bundle_path=None):
         channel = creator["channel_name"] or slug
         if isinstance(voice, str):
             voice = json.loads(voice)
-        # If DB has empty voice, try bundle
         if not voice and bundle_path:
             voice, ch = _load_voice_from_bundle(bundle_path)
             if ch:
                 channel = ch
     else:
-        # DB has nothing — load entirely from bundle
         voice, channel = _load_voice_from_bundle(bundle_path)
         if not channel:
             channel = slug
 
     return voice, channel
 
+
+# ─── Chat (RAG Q&A) ─────────────────────────────────────────────
 
 def handle_chat(slug: str, question: str, bundle_path: Path = None) -> dict:
     """
@@ -132,7 +151,6 @@ def handle_chat(slug: str, question: str, bundle_path: Path = None) -> dict:
     # 2. Vector search via pgvector
     hits = search_chunks(slug, q_emb, k=5)
     if not hits:
-        # Fallback: try loading from bundle JSON if DB is empty
         if bundle_path:
             hits = _fallback_json_search(slug, q_emb, bundle_path)
         if not hits:
@@ -163,15 +181,20 @@ def handle_chat(slug: str, question: str, bundle_path: Path = None) -> dict:
 YOUR VOICE:
 {voice_json}
 
-RULES:
+CRITICAL — ABSOLUTELY NO CITATIONS OR REFERENCES:
+- NEVER include anything in square brackets like [Source: ...] or [website.com]
+- NEVER mention website names, URLs, or domain names (no "vnexpress.net", no "thevietnamyield.com", etc.)
+- NEVER reference where information came from. You just KNOW this stuff from experience.
+- NEVER mention video titles or link to videos. The UI handles that separately.
+- If you feel the urge to cite something, just state the fact directly as your own knowledge.
+
+STYLE RULES:
 - Speak as {channel} in first person ("I", "my experience").
-- Synthesize ALL knowledge into one natural response.
-- NEVER cite sources inline. No "[Source: ...]" or brackets. Just speak naturally.
-- Do NOT mention video titles. The UI adds relevant links below.
+- Synthesize ALL knowledge into one natural response — like you're talking to a friend.
 - Be direct, practical, conversational.
 - Use your signature phrases naturally when they fit.
 - Keep responses focused and actionable. No fluff.
-- Do NOT end with video recommendations.
+- Do NOT end with video recommendations or "check out" suggestions.
 - Do NOT use bullet points or numbered lists. Talk naturally in paragraphs.
 - The current year is {year}."""
 
@@ -186,9 +209,7 @@ RULES:
             {"role": "system", "content": sys_prompt},
             {"role": "user", "content": user_msg},
         ], temperature=0.5, max_tokens=1200)
-        # Strip any trailing video recommendations the model adds
-        answer = re.sub(r'You might want to check out.*$', '', answer, flags=re.DOTALL).strip()
-        answer = re.sub(r'Check out these videos.*$', '', answer, flags=re.DOTALL).strip()
+        answer = _clean_answer(answer)
     except Exception as e:
         return {"answer": "Sorry, I'm having trouble responding right now. Please try again.",
                 "sources": relevant_sources[:3], "error": str(e)}
