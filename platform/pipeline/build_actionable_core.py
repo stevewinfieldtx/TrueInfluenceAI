@@ -436,7 +436,7 @@ nav{{padding:14px 32px;display:flex;align-items:center;justify-content:space-bet
 def _build_js_block(slug, channel, big_bet_esc):
     """Build JS that calls /api/write/{slug} server-side.
     ZERO API keys in the browser. All LLM calls happen on the server."""
-    tpl = '<script>
+    tpl = '''<script>
 const SLUG="__SLUG__";
 const CH="__CH__";
 const BIGBET="__BIGBET__";
@@ -499,5 +499,5 @@ async function explainMore(btn){
   }catch(e){m.c.innerHTML=\'<div style="color:#f87171">Error: \'+e.message+\'</div>\'}
   btn.disabled=false;btn.textContent="\\ud83d\\udd0d Explain More";
 }
-</script>'
+</script>'''
     return tpl.replace("__SLUG__", slug).replace("__CH__", channel).replace("__BIGBET__", big_bet_esc)
