@@ -67,17 +67,60 @@ def _llm_call(messages: list, model: str = None, temperature: float = 0.5,
 
 # ─── Chat (RAG Q&A) ─────────────────────────────────────────────
 
+def _load_voice_from_bundle(bundle_path):
+    """Load voice profile + channel name from bundle JSON files (fallback when DB is empty)."""
+    bp = Path(bundle_path) if bundle_path else None
+    voice = {}
+    channel = ""
+    if bp:
+        vp = bp / "voice_profile.json"
+        if vp.exists():
+            try:
+                voice = json.loads(vp.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+        mp = bp / "manifest.json"
+        if mp.exists():
+            try:
+                manifest = json.loads(mp.read_text(encoding="utf-8"))
+                channel = manifest.get("channel", "")
+            except Exception:
+                pass
+    return voice, channel
+
+
+def _get_creator_voice(slug, bundle_path=None):
+    """Get voice profile + channel name. DB first, bundle JSON fallback."""
+    try:
+        creator = get_creator(slug)
+    except Exception:
+        creator = None
+
+    if creator:
+        voice = creator["voice_profile"] if creator["voice_profile"] else {}
+        channel = creator["channel_name"] or slug
+        if isinstance(voice, str):
+            voice = json.loads(voice)
+        # If DB has empty voice, try bundle
+        if not voice and bundle_path:
+            voice, ch = _load_voice_from_bundle(bundle_path)
+            if ch:
+                channel = ch
+    else:
+        # DB has nothing — load entirely from bundle
+        voice, channel = _load_voice_from_bundle(bundle_path)
+        if not channel:
+            channel = slug
+
+    return voice, channel
+
+
 def handle_chat(slug: str, question: str, bundle_path: Path = None) -> dict:
     """
     Full RAG: embed question -> pgvector search -> build context -> LLM answer.
     Returns: {answer, sources: [{title, url}]}
     """
-    # Get creator data from DB
-    creator = get_creator(slug)
-    voice = creator["voice_profile"] if creator else {}
-    channel = creator["channel_name"] if creator else slug
-    if isinstance(voice, str):
-        voice = json.loads(voice)
+    voice, channel = _get_creator_voice(slug, bundle_path)
 
     # 1. Embed the question
     try:
@@ -220,11 +263,7 @@ def handle_write(slug: str, topic: str, write_type: str, bundle_path: Path = Non
     write_type: 'start' | 'write' | 'explain'
     Returns: {content: str}
     """
-    creator = get_creator(slug)
-    voice = creator["voice_profile"] if creator else {}
-    channel = creator["channel_name"] if creator else slug
-    if isinstance(voice, str):
-        voice = json.loads(voice)
+    voice, channel = _get_creator_voice(slug, bundle_path)
 
     year = datetime.now().year
     voice_json = json.dumps(voice) if voice else "{}"

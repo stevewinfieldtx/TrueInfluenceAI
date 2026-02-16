@@ -232,7 +232,7 @@ async function askQ(q){{
       d.sources.forEach(function(s){{refs+='<a href="'+s.url+'" target="_blank">'+s.title+'</a> · ';}});
       refs+='</div>';
     }}
-    document.getElementById('thinking').outerHTML='<div class="msg ai">'+answer.replace(/\n/g,'<br>')+refs+'</div>';
+    document.getElementById('thinking').outerHTML='<div class="msg ai">'+answer.replace(/\\n/g,'<br>')+refs+'</div>';
   }}catch(e){{
     document.getElementById('thinking').outerHTML='<div class="msg ai" style="color:var(--red)">Error: '+e.message+'</div>';
   }}
