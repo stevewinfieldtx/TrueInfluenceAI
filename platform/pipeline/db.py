@@ -55,9 +55,18 @@ def db_cursor(commit=True):
 
 def init_db():
     """Create tables + pgvector extension. Safe to call on every startup."""
+    # Step 1: Create extension using RAW connection (no register_vector yet)
+    raw_conn = psycopg2.connect(DATABASE_URL)
+    try:
+        raw_cur = raw_conn.cursor()
+        raw_cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+        raw_conn.commit()
+        raw_cur.close()
+    finally:
+        raw_conn.close()
+
+    # Step 2: Now register_vector will work
     with db_cursor() as cur:
-        # Enable pgvector
-        cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
 
         # Creators
         cur.execute("""
