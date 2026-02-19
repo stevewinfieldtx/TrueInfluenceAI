@@ -16,9 +16,9 @@ from datetime import datetime
 import requests
 
 try:
-    from pipeline.db import search_chunks, get_creator
+    from pipeline.db import search_chunks, search_disney_kb, get_creator
 except ImportError:
-    from db import search_chunks, get_creator
+    from db import search_chunks, search_disney_kb, get_creator
 
 # ─── ALL config from environment — NEVER hardcoded ──────────────
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
@@ -148,20 +148,39 @@ def handle_chat(slug: str, question: str, bundle_path: Path = None) -> dict:
         return {"answer": "Sorry, I had trouble processing that. Please try again.",
                 "sources": [], "error": str(e)}
 
-    # 2. Vector search via pgvector
+    # 2. Vector search — Layer 1 (creator content) + Layer 2 (Disney KB)
     hits = search_chunks(slug, q_emb, k=5)
-    if not hits:
-        if bundle_path:
-            hits = _fallback_json_search(slug, q_emb, bundle_path)
-        if not hits:
-            return {"answer": "I don't have enough information on that topic yet. "
-                              "Try asking about something I've covered in my videos.",
-                    "sources": []}
+    if not hits and bundle_path:
+        hits = _fallback_json_search(slug, q_emb, bundle_path)
 
-    # 3. Build context
-    context = "\n---\n".join(
-        f"[Source: {h.get('source_title', h.get('video_id', ''))}]\n{h['text']}" for h in hits
-    )
+    # Layer 2: Disney Knowledge Base (shared across all agents)
+    kb_hits = []
+    try:
+        kb_hits = search_disney_kb(q_emb, k=3)
+    except Exception as e:
+        print(f"   [ChatAPI] Disney KB search skipped: {e}")
+
+    if not hits and not kb_hits:
+        return {"answer": "I don't have enough information on that topic yet. "
+                          "Try asking about something I've covered in my videos.",
+                "sources": []}
+
+    # 3. Build context — creator content (Layer 1) + Disney KB (Layer 2)
+    creator_context = "\n---\n".join(
+        f"[Your personal experience]\n{h['text']}" for h in hits
+    ) if hits else ""
+
+    kb_context = "\n---\n".join(
+        f"[Disney reference: {h.get('category', 'general')}]\n{h['text']}" for h in kb_hits
+    ) if kb_hits else ""
+
+    context = ""
+    if creator_context and kb_context:
+        context = f"YOUR PERSONAL EXPERIENCE AND KNOWLEDGE (prioritize this):\n{creator_context}\n\nGENERAL DISNEY REFERENCE (use to supplement):\n{kb_context}"
+    elif creator_context:
+        context = creator_context
+    elif kb_context:
+        context = f"DISNEY REFERENCE KNOWLEDGE:\n{kb_context}"
     seen = set()
     relevant_sources = []
     for h in hits:

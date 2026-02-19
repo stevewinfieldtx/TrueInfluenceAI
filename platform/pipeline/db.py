@@ -371,5 +371,59 @@ def sync_from_bundle(slug, bundle_path):
     print(f"   [DB] Synced {slug} from bundle")
 
 
+# ---------------------------------------------------------------------------
+# Disney Knowledge Base Search
+# ---------------------------------------------------------------------------
+
+def search_disney_kb(query_embedding, k=5, category=None):
+    """
+    Vector similarity search against the shared Disney Knowledge Base.
+    Returns top-k chunks with scores. Optionally filter by category.
+    """
+    with db_cursor(commit=False) as cur:
+        if category:
+            cur.execute("""
+                SELECT
+                    text,
+                    category,
+                    subcategory,
+                    chunk_id,
+                    1 - (embedding <=> %s::vector) AS score
+                FROM disney_kb
+                WHERE category = %s
+                ORDER BY embedding <=> %s::vector
+                LIMIT %s
+            """, (str(query_embedding), category, str(query_embedding), k))
+        else:
+            cur.execute("""
+                SELECT
+                    text,
+                    category,
+                    subcategory,
+                    chunk_id,
+                    1 - (embedding <=> %s::vector) AS score
+                FROM disney_kb
+                ORDER BY embedding <=> %s::vector
+                LIMIT %s
+            """, (str(query_embedding), str(query_embedding), k))
+        rows = cur.fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_disney_kb_stats():
+    """Get counts per category in the Disney KB."""
+    try:
+        with db_cursor(commit=False) as cur:
+            cur.execute("""
+                SELECT category, COUNT(*) as chunk_count
+                FROM disney_kb
+                GROUP BY category
+                ORDER BY category
+            """)
+            return [dict(r) for r in cur.fetchall()]
+    except Exception:
+        return []
+
+
 # Alias for server.py import
 sync_bundle_to_db = sync_from_bundle
