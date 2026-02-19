@@ -426,6 +426,118 @@ async def api_write(slug: str, request: Request):
 
 
 # ---------------------------------------------------------------------------
+# API: Lead Capture — stores leads + emails Melissa
+# ---------------------------------------------------------------------------
+@app.post("/api/lead/{slug}")
+async def api_lead(slug: str, request: Request):
+    body = await request.json()
+    if not body:
+        raise HTTPException(400, "Lead data is required")
+
+    # Save to database
+    from pipeline.db import save_lead
+    lead_id = await asyncio.to_thread(save_lead, slug, body)
+
+    # Send email notification (async, don't block response)
+    async def _notify():
+        try:
+            await asyncio.to_thread(send_lead_email, slug, body, lead_id)
+        except Exception as e:
+            print(f"Lead email failed (non-fatal): {e}")
+    asyncio.create_task(_notify())
+
+    return JSONResponse({"status": "captured", "lead_id": lead_id})
+
+
+@app.get("/api/leads/{slug}")
+async def api_leads(slug: str):
+    from pipeline.db import get_leads
+    leads = await asyncio.to_thread(get_leads, slug)
+    return JSONResponse({"leads": leads, "count": len(leads)},
+                        default=str)  # handles datetime serialization
+
+
+def send_lead_email(slug, lead_data, lead_id):
+    """Send lead notification via SMTP (Mailgun, Gmail, etc)."""
+    import smtplib
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+
+    smtp_host = os.getenv("SMTP_HOST", "")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER", "")
+    smtp_pass = os.getenv("SMTP_PASS", "")
+    notify_email = os.getenv("LEAD_NOTIFY_EMAIL", "stevewinfieldtx@gmail.com")
+    from_email = os.getenv("SMTP_FROM", smtp_user)
+
+    if not all([smtp_host, smtp_user, smtp_pass]):
+        print(f"   [LEAD] No SMTP config — lead #{lead_id} saved but email skipped")
+        return
+
+    source = lead_data.get('source', 'chat')
+    name = lead_data.get('name', 'Unknown')
+    summary = lead_data.get('summary', 'No summary')
+    next_steps = lead_data.get('next_steps', '')
+
+    subject = f"\U0001f3b0 New {source.upper()} Lead: {name}" if name != 'Unknown' else f"\U0001f3b0 New {source.upper()} interaction on your site"
+
+    # Build a clean HTML email
+    fields = [
+        ('Source', source),
+        ('Name', lead_data.get('name')),
+        ('Email', lead_data.get('email')),
+        ('Phone', lead_data.get('phone')),
+        ('Party', lead_data.get('party_composition')),
+        ('Travel Dates', lead_data.get('travel_dates')),
+        ('Destination', lead_data.get('destination')),
+        ('Budget', lead_data.get('budget')),
+        ('Special Occasion', lead_data.get('special_occasion')),
+        ('Experience Prefs', lead_data.get('experience_prefs')),
+        ('Previous Disney', lead_data.get('previous_experience')),
+        ('Priorities', lead_data.get('priorities')),
+    ]
+
+    rows = ''.join(
+        f'<tr><td style="padding:6px 12px;font-weight:bold;color:#7B2D8E;">{k}</td>'
+        f'<td style="padding:6px 12px;">{v}</td></tr>'
+        for k, v in fields if v
+    )
+
+    html = f"""
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+        <div style="background:linear-gradient(135deg,#7B2D8E,#E91E8C);padding:20px;border-radius:12px 12px 0 0;">
+            <h2 style="color:white;margin:0;">New Lead from Your Website!</h2>
+        </div>
+        <div style="background:#fff;padding:20px;border:1px solid #eee;">
+            <h3 style="color:#7B2D8E;margin-top:0;">Summary</h3>
+            <p style="color:#333;line-height:1.6;">{summary}</p>
+            {'<h3 style="color:#E91E8C;">Next Steps for Follow-up</h3><p style="color:#333;line-height:1.6;">' + next_steps + '</p>' if next_steps else ''}
+            <h3 style="color:#7B2D8E;">Details</h3>
+            <table style="width:100%;border-collapse:collapse;">{rows}</table>
+            {'<h3 style="color:#7B2D8E;">Conversation</h3><pre style="background:#f8f4fc;padding:12px;border-radius:8px;font-size:13px;white-space:pre-wrap;">' + (lead_data.get("conversation") or "") + '</pre>' if lead_data.get('conversation') else ''}
+            {'<h3 style="color:#7B2D8E;">Question Asked</h3><p><strong>' + (lead_data.get("question") or "") + '</strong></p><p>' + (lead_data.get("answer") or "") + '</p>' if lead_data.get('question') else ''}
+        </div>
+        <div style="background:#f8f4fc;padding:12px;text-align:center;border-radius:0 0 12px 12px;">
+            <small style="color:#999;">Lead #{lead_id} · TrueInfluence AI</small>
+        </div>
+    </div>
+    """
+
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = subject
+    msg['From'] = from_email
+    msg['To'] = notify_email
+    msg.attach(MIMEText(html, 'html'))
+
+    with smtplib.SMTP(smtp_host, smtp_port) as server:
+        server.starttls()
+        server.login(smtp_user, smtp_pass)
+        server.sendmail(from_email, notify_email, msg.as_string())
+
+    print(f"   [LEAD] Email sent to {notify_email} for lead #{lead_id}")
+
+
+# ---------------------------------------------------------------------------
 # API: Force sync a creator's bundle to database
 # ---------------------------------------------------------------------------
 @app.post("/api/sync/{slug}")

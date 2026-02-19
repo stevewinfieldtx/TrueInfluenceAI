@@ -115,6 +115,35 @@ def init_db():
             );
         """)
         cur.execute("CREATE INDEX IF NOT EXISTS idx_chunks_slug ON chunks(slug);")
+        # Leads table — captures chat conversations and Q&A interactions
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS leads (
+                id              SERIAL PRIMARY KEY,
+                slug            TEXT NOT NULL,
+                source          TEXT NOT NULL DEFAULT 'chat',
+                name            TEXT,
+                email           TEXT,
+                phone           TEXT,
+                party_composition TEXT,
+                travel_dates    TEXT,
+                destination     TEXT,
+                budget          TEXT,
+                special_occasion TEXT,
+                experience_prefs TEXT,
+                previous_experience TEXT,
+                priorities      TEXT,
+                summary         TEXT,
+                next_steps      TEXT,
+                conversation    TEXT,
+                question        TEXT,
+                answer          TEXT,
+                notified        BOOLEAN NOT NULL DEFAULT FALSE,
+                created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+        """)
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_leads_slug ON leads(slug);")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_leads_created ON leads(created_at DESC);")
+
     print("   [DB] Tables created")
 
     # Step 3: ivfflat index in SEPARATE transaction
@@ -408,6 +437,56 @@ def search_disney_kb(query_embedding, k=5, category=None):
             """, (str(query_embedding), str(query_embedding), k))
         rows = cur.fetchall()
         return [dict(r) for r in rows]
+
+
+# ---------------------------------------------------------------------------
+# Lead Capture
+# ---------------------------------------------------------------------------
+
+def save_lead(slug, lead_data):
+    """Save a lead from chat or Q&A interaction."""
+    with db_cursor() as cur:
+        cur.execute("""
+            INSERT INTO leads (slug, source, name, email, phone,
+                party_composition, travel_dates, destination, budget,
+                special_occasion, experience_prefs, previous_experience,
+                priorities, summary, next_steps, conversation, question, answer)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
+        """, (
+            slug,
+            lead_data.get('source', 'chat'),
+            lead_data.get('name'),
+            lead_data.get('email'),
+            lead_data.get('phone'),
+            lead_data.get('party_composition'),
+            lead_data.get('travel_dates'),
+            lead_data.get('destination'),
+            lead_data.get('budget'),
+            lead_data.get('special_occasion'),
+            lead_data.get('experience_prefs'),
+            lead_data.get('previous_experience'),
+            lead_data.get('priorities'),
+            lead_data.get('summary'),
+            lead_data.get('next_steps'),
+            lead_data.get('conversation'),
+            lead_data.get('question'),
+            lead_data.get('answer'),
+        ))
+        row = cur.fetchone()
+        return row['id'] if row else None
+
+
+def get_leads(slug, limit=50):
+    """Get recent leads for a creator."""
+    with db_cursor(commit=False) as cur:
+        cur.execute("""
+            SELECT * FROM leads
+            WHERE slug = %s
+            ORDER BY created_at DESC
+            LIMIT %s
+        """, (slug, limit))
+        return cur.fetchall()
 
 
 def get_disney_kb_stats():
