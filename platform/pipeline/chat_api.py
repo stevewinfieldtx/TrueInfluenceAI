@@ -22,10 +22,8 @@ except ImportError:
 
 # ─── ALL config from environment — NEVER hardcoded ──────────────
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
-OPENROUTER_MODEL_ID = os.getenv("OPENROUTER_MODEL_ID", "google/gemini-2.5-flash-lite:online")
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "qwen/qwen3-embedding-8b")
-WRITING_MODEL = os.getenv("OPENROUTER_MODEL_ID", "google/gemini-2.5-flash-lite:online")
-CHAT_MODEL = os.getenv("CHAT_MODEL", "anthropic/claude-haiku-4.5")  # Fast, cheap, good at instructions
+OPENROUTER_MODEL_ID = os.getenv("OPENROUTER_MODEL_ID", "")  # All LLM calls
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "")            # Embeddings only
 
 
 # ─── Low-level helpers ───────────────────────────────────────────
@@ -285,7 +283,7 @@ Current year is {year}."""
         answer = _llm_call([
             {"role": "system", "content": sys_prompt},
             {"role": "user", "content": user_msg},
-        ], model=CHAT_MODEL, temperature=0.7, max_tokens=200 if is_chat_widget else 600)
+        ], temperature=0.7, max_tokens=200 if is_chat_widget else 600)
         answer = _clean_answer(answer)
     except Exception as e:
         return {"answer": "Sorry, I'm having trouble responding right now. Please try again.",
@@ -418,7 +416,7 @@ RULES:
         content = _llm_call([
             {"role": "system", "content": sys_prompt},
             {"role": "user", "content": user_prompt},
-        ], model=WRITING_MODEL, temperature=0.6, max_tokens=2000)
+        ], temperature=0.6, max_tokens=2000)
         return {"content": content}
     except Exception as e:
         return {"content": "Sorry, content generation failed. Please try again.",
