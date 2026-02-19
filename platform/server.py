@@ -26,6 +26,7 @@ from fastapi import FastAPI, Request, BackgroundTasks, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
 # Load .env from project root (one level up), fall back to current dir
@@ -44,6 +45,15 @@ PORT = int(os.getenv("PORT", 8080))
 # App
 # ---------------------------------------------------------------------------
 app = FastAPI(title="TrueInfluenceAI", version="1.0.0")
+
+# CORS — allow creator websites to call the chat API
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # TODO: restrict to registered creator domains in production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 STATIC_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
