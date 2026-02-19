@@ -35,7 +35,9 @@ def build_voice_profile(bundle_dir):
         return
 
     # Recency-weighted sampling: recent content counts ~5x more
-    sampled = _recency_weighted_sample(chunks, sources, n=35)
+    # Use 50% of available chunks for richer analysis
+    half_count = max(35, len(chunks) // 2)
+    sampled = _recency_weighted_sample(chunks, sources, n=half_count)
     content_block = "\n---\n".join(c["text"][:500] for c in sampled)
 
     prompt = f"""You are a world-class forensic linguist and ghostwriter. Your job is to dissect {channel}'s 
