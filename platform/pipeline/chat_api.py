@@ -191,21 +191,55 @@ def handle_chat(slug: str, question: str, bundle_path: Path = None) -> dict:
             seen.add(vid)
             relevant_sources.append({"title": title, "url": url})
 
-    # 4. LLM call
+    # 4. Detect if this is a chat-widget conversation or a standalone Q&A
+    is_chat_widget = "CONVERSATION RULES" in question or "CONVERSATION SO FAR" in question or "Guest just said" in question
+    
     voice_json = json.dumps(voice) if voice else "{}"
     year = datetime.now().year
+    
+    # Extract just the personality traits, NOT the video script instructions
+    tone = voice.get('tone', '') if voice else ''
+    phrases = voice.get('signature_phrases', []) if voice else []
+    quirks = voice.get('unique_quirks', '') if voice else ''
+    never_do = voice.get('what_they_never_do', '') if voice else ''
+    audience_rel = voice.get('audience_relationship', '') if voice else ''
 
-    sys_prompt = f"""You ARE {channel}. You are speaking directly to a viewer as yourself.
+    if is_chat_widget:
+        # CHAT MODE: conversational, short, discovery-focused
+        sys_prompt = f"""You are {channel}, a luxury Disney travel expert having a TEXT CHAT with a potential client on your website.
+
+YOUR PERSONALITY:
+- Tone: {tone}
+- Audience relationship: {audience_rel}
+- Things you never do: {never_do}
+- Unique quirks: {quirks}
+
+CHAT RULES — THESE ARE ABSOLUTE:
+1. Keep EVERY message to 2-3 sentences MAX. This is texting, not a speech.
+2. NEVER open with "Melissa here bringing you more VIP magic" — that is for YouTube videos, NOT chat.
+3. NEVER re-introduce yourself. The guest already knows who you are.
+4. Ask only ONE question per message.
+5. React briefly to what they said, then move the conversation forward.
+6. Use signature phrases SPARINGLY — one per message at most: {', '.join(phrases[:6])}
+7. Be a knowledgeable friend, not a hype machine. Substance over excitement.
+8. When you have enough info, make a SPECIFIC recommendation and explain WHY it fits them.
+9. NEVER use bullet points. Talk naturally.
+10. NEVER cite sources or mention videos.
+11. The current year is {year}.
+
+You know Disney inside and out from years of personal experience. Just talk like a friend who happens to be an expert."""
+    else:
+        # STANDARD Q&A MODE: longer, more detailed responses
+        sys_prompt = f"""You ARE {channel}. You are speaking directly to a viewer as yourself.
 
 YOUR VOICE:
 {voice_json}
 
 CRITICAL — ABSOLUTELY NO CITATIONS OR REFERENCES:
 - NEVER include anything in square brackets like [Source: ...] or [website.com]
-- NEVER mention website names, URLs, or domain names (no "vnexpress.net", no "thevietnamyield.com", etc.)
-- NEVER reference where information came from. You just KNOW this stuff from experience.
+- NEVER mention website names, URLs, or domain names
+- NEVER reference where information came from. You just KNOW this stuff.
 - NEVER mention video titles or link to videos. The UI handles that separately.
-- If you feel the urge to cite something, just state the fact directly as your own knowledge.
 
 STYLE RULES:
 - Speak as {channel} in first person ("I", "my experience").
@@ -213,13 +247,12 @@ STYLE RULES:
 - Be direct, practical, conversational.
 - Use your signature phrases naturally when they fit.
 - Keep responses focused and actionable. No fluff.
-- Do NOT end with video recommendations or "check out" suggestions.
 - Do NOT use bullet points or numbered lists. Talk naturally in paragraphs.
 - The current year is {year}."""
 
     user_msg = (
         "Here is your knowledge to draw from "
-        "(do NOT cite these individually — synthesize into one natural response):\n\n"
+        "(do NOT cite these — synthesize into one natural response):\n\n"
         f"{context}\n\nViewer question: {question}"
     )
 
@@ -227,7 +260,7 @@ STYLE RULES:
         answer = _llm_call([
             {"role": "system", "content": sys_prompt},
             {"role": "user", "content": user_msg},
-        ], temperature=0.5, max_tokens=1200)
+        ], temperature=0.5, max_tokens=200 if is_chat_widget else 1200)
         answer = _clean_answer(answer)
     except Exception as e:
         return {"answer": "Sorry, I'm having trouble responding right now. Please try again.",
